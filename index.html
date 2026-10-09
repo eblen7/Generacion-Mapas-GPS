@@ -1,0 +1,2237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AgroField Capture · Visor GIS</title>
+<meta name="description" content="Visor GIS, colector GPS de campo sin conexión y generador de capturas satelitales para muestreo de suelos.">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AgroField">
+<meta name="format-detection" content="telephone=no">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f172a'/%3E%3Cpath d='M14 46 L24 16 L48 22 L52 44 Z' fill='none' stroke='%23facc15' stroke-width='4.5' stroke-linejoin='round'/%3E%3Ccircle cx='30' cy='30' r='4.5' fill='%2310b981' stroke='%23fff' stroke-width='2'/%3E%3Ccircle cx='40' cy='38' r='4.5' fill='%2310b981' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+/* =====================================================================
+   ESTILOS (CSS propio embebido: funciona sin conexión, sin Tailwind CDN)
+   ===================================================================== */
+:root{
+  --bg:#0f172a; --bg2:#0b1220; --panel:#1e293b; --glass:rgba(30,41,59,.72);
+  --line:rgba(148,163,184,.14); --line2:rgba(148,163,184,.28);
+  --txt:#e2e8f0; --muted:#94a3b8; --dim:#64748b;
+  --em:#10b981; --em2:#059669; --em-soft:rgba(16,185,129,.13); --em-txt:#6ee7b7;
+  --neon:#facc15; --warn:#f59e0b; --err:#ef4444; --cyan:#22d3ee;
+  --font:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--txt);font:400 14px/1.45 var(--font);-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;
+  background-image:radial-gradient(1200px 600px at 85% -10%,rgba(16,185,129,.08),transparent 60%),radial-gradient(900px 500px at -10% 110%,rgba(34,211,238,.05),transparent 60%);
+  display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;overflow:hidden}
+button,input,select{font-family:inherit}
+.mono{font-family:var(--mono)}
+.ic{width:18px;height:18px;flex:none;display:block}
+[hidden]{display:none !important}
+::selection{background:rgba(16,185,129,.35)}
+
+/* ---------- Barra superior ---------- */
+.topbar{display:flex;align-items:center;gap:14px;padding:10px 16px;padding-top:calc(10px + var(--sat));background:rgba(15,23,42,.88);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);position:relative;z-index:600;flex:none}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand-ic{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(135deg,#10b981,#047857);color:#fff;box-shadow:0 8px 22px -6px rgba(16,185,129,.55);flex:none}
+.brand-ic .ic{width:21px;height:21px}
+.brand h1{font-size:15px;margin:0;font-weight:700;letter-spacing:-.015em;white-space:nowrap}
+.brand p{margin:0;font-size:11px;color:var(--muted);white-space:nowrap}
+.tabs{display:flex;gap:4px;background:rgba(2,6,23,.55);padding:4px;border-radius:12px;border:1px solid var(--line);margin:0 auto}
+.tab{display:flex;align-items:center;gap:8px;border:0;background:transparent;color:var(--muted);font:600 13px var(--font);padding:9px 14px;border-radius:9px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:.15s}
+.tab:hover{color:var(--txt)}
+.tab.active{background:var(--panel);color:#fff;box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 4px 14px rgba(0,0,0,.25)}
+.tab.active .ic{color:var(--em)}
+.tab .count{font:600 11px var(--mono);background:var(--em-soft);color:var(--em-txt);padding:2px 7px;border-radius:99px}
+.tab .short{display:none}
+.top-actions{display:flex;align-items:center;gap:8px;flex:none}
+.conn{display:inline-flex;align-items:center;gap:7px;font:600 12px var(--font);padding:6px 10px;border-radius:99px;border:1px solid var(--line2);color:var(--em-txt);background:var(--em-soft)}
+.conn::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--em);box-shadow:0 0 0 3px rgba(16,185,129,.25)}
+.conn.off{color:#fdba74;background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4)}
+.conn.off::before{background:var(--warn);box-shadow:0 0 0 3px rgba(245,158,11,.25)}
+
+/* ---------- Cartel sin conexión ---------- */
+.offline-banner{flex:none;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;padding:9px 16px;
+  background:linear-gradient(90deg,#9a3412,#c2410c 50%,#9a3412);color:#fff;font-size:13px;text-align:center;position:relative;z-index:590;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+.offline-banner strong{font-size:14px;letter-spacing:.02em;text-transform:uppercase}
+.offline-banner .ic{width:20px;height:20px}
+
+/* ---------- Estructura principal ---------- */
+main{flex:1;min-height:0;position:relative}
+.tab-panel{display:none;height:100%}
+.tab-panel.active{display:block}
+#tab-visor.active{display:grid;grid-template-columns:minmax(350px,30%) 1fr;gap:12px;padding:12px;height:100%}
+.glass{background:var(--glass);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:1px solid var(--line);border-radius:18px;box-shadow:0 20px 50px -20px rgba(0,0,0,.6)}
+.side{overflow-y:auto;overflow-x:hidden;padding:12px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:#334155 transparent}
+.side::-webkit-scrollbar{width:8px}.side::-webkit-scrollbar-thumb{background:#334155;border-radius:8px}
+
+/* ---------- Secciones plegables ---------- */
+.sec{border:1px solid var(--line);border-radius:14px;background:rgba(15,23,42,.42);margin-bottom:10px;overflow:hidden}
+.sec>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;font-weight:650;font-size:13.5px;-webkit-tap-highlight-color:transparent;user-select:none}
+.sec>summary::-webkit-details-marker{display:none}
+.sec>summary .sec-ic{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--em-soft);color:var(--em)}
+.sec>summary .sec-ic .ic{width:16px;height:16px}
+.sec>summary .chev{margin-left:auto;color:var(--dim);transition:transform .2s}
+.sec[open]>summary .chev{transform:rotate(180deg)}
+.sec>summary .pill{font:600 11px var(--mono);color:var(--muted);background:rgba(148,163,184,.1);padding:2px 8px;border-radius:99px}
+.sec-body{padding:2px 14px 14px}
+.hint{font-size:12px;color:var(--muted);margin:0 0 10px}
+.lbl{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;color:#cbd5e1;margin:12px 0 6px}
+.lbl:first-child{margin-top:4px}
+
+/* ---------- Controles ---------- */
+.inp{width:100%;background:rgba(2,6,23,.6);border:1px solid var(--line2);color:var(--txt);border-radius:10px;padding:11px 12px;font:500 16px var(--font);outline:none;transition:border-color .15s,box-shadow .15s}
+.inp:focus{border-color:var(--em);box-shadow:0 0 0 3px rgba(16,185,129,.2)}
+.inp::placeholder{color:var(--dim)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 13px/1.1 var(--font);padding:10px 14px;border-radius:10px;border:1px solid transparent;cursor:pointer;color:var(--txt);background:rgba(148,163,184,.1);transition:background .15s,transform .05s,border-color .15s,color .15s;white-space:nowrap;-webkit-tap-highlight-color:transparent;text-decoration:none}
+.btn:hover{background:rgba(148,163,184,.18)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn:focus-visible,.icon-btn:focus-visible,.tab:focus-visible{outline:2px solid var(--em);outline-offset:2px}
+.btn-primary{background:var(--em);color:#04231a}
+.btn-primary:hover{background:#34d399}
+.btn-outline{border-color:rgba(16,185,129,.5);color:var(--em-txt);background:var(--em-soft)}
+.btn-outline:hover{background:rgba(16,185,129,.22)}
+.btn-ghost{background:transparent;border-color:var(--line2)}
+.btn-danger{background:rgba(239,68,68,.1);color:#fca5a5;border-color:rgba(239,68,68,.35)}
+.btn-danger:hover{background:rgba(239,68,68,.2)}
+.btn-danger-solid{background:#dc2626;color:#fff}
+.btn-danger-solid:hover{background:#ef4444}
+.btn-lg{padding:15px 16px;font-size:15px;border-radius:12px}
+.btn-sm{padding:7px 10px;font-size:12px;border-radius:8px}
+.btn-sm .ic{width:15px;height:15px}
+.w-full{width:100%}
+.row{display:flex;gap:8px;align-items:center}
+.row.wrap{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.icon-btn{display:inline-grid;place-items:center;width:32px;height:32px;padding:0;border-radius:8px;background:transparent;border:1px solid transparent;color:var(--muted);cursor:pointer;flex:none;-webkit-tap-highlight-color:transparent}
+.icon-btn .ic{width:16px;height:16px}
+.icon-btn:hover{color:var(--txt);background:rgba(148,163,184,.12)}
+.icon-btn.danger:hover{color:#fca5a5;background:rgba(239,68,68,.12)}
+.icon-btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-capture{background:linear-gradient(135deg,#10b981,#059669);color:#fff;box-shadow:0 10px 26px -10px rgba(16,185,129,.7);min-height:56px}
+.btn-capture:hover{background:linear-gradient(135deg,#34d399,#10b981)}
+.btn-capture.capturing{background:linear-gradient(135deg,#0e7490,#155e75);box-shadow:0 0 0 0 rgba(34,211,238,.6);animation:pulse 1.4s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,211,238,.55)}100%{box-shadow:0 0 0 14px rgba(34,211,238,0)}}
+.btn-process{width:100%;padding:17px 16px;font-size:15px;border-radius:14px;background:linear-gradient(135deg,#10b981 0%,#059669 60%,#047857 100%);color:#fff;
+  box-shadow:0 14px 34px -12px rgba(16,185,129,.75),inset 0 1px 0 rgba(255,255,255,.18)}
+.btn-process:hover{filter:brightness(1.08);background:linear-gradient(135deg,#10b981 0%,#059669 60%,#047857 100%)}
+.btn-process .ic{width:20px;height:20px}
+
+/* Selector segmentado */
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:rgba(2,6,23,.55);border:1px solid var(--line);padding:4px;border-radius:11px}
+.seg button{border:0;background:transparent;color:var(--muted);padding:9px 6px;border-radius:8px;font:600 12px var(--font);cursor:pointer;line-height:1.25}
+.seg button small{display:block;font:500 10.5px var(--mono);opacity:.8}
+.seg button.on{background:var(--em);color:#04231a}
+input[type=range]{width:100%;accent-color:var(--em);height:28px}
+.range-scale{display:flex;justify-content:space-between;font:500 10.5px var(--mono);color:var(--dim);margin-top:-4px}
+
+/* Casillas */
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.chk{display:flex;align-items:center;gap:8px;padding:8px 9px;border:1px solid var(--line);border-radius:9px;background:rgba(2,6,23,.35);cursor:pointer;font-size:12px;line-height:1.25;-webkit-tap-highlight-color:transparent}
+.chk input{width:16px;height:16px;accent-color:var(--em);flex:none;margin:0}
+.chk.locked{grid-column:1/-1;opacity:.7;cursor:default}
+.chk em{color:var(--dim);font-style:normal}
+/* Selector de símbolo */
+.symgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.symgrid button{display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 4px 8px;border:1px solid var(--line);border-radius:10px;background:rgba(2,6,23,.35);color:var(--muted);font:600 10.5px/1.2 var(--font);cursor:pointer;text-align:center;-webkit-tap-highlight-color:transparent;transition:.15s}
+.symgrid button:hover{border-color:var(--line2);color:var(--txt)}
+.symgrid button.on{border-color:var(--em);background:var(--em-soft);color:var(--em-txt);box-shadow:0 0 0 1px var(--em) inset}
+.sym-size-prev{width:64px;height:52px;flex:none;display:grid;place-items:center;border-radius:9px;border:1px solid var(--line);background:linear-gradient(135deg,#4b5d3a,#6b7b4c);overflow:hidden}
+.symgrid .sym-prev{width:44px;height:38px;display:grid;place-items:center;border-radius:8px;background:linear-gradient(135deg,#4b5d3a,#6b7b4c)}
+.sym-icon{background:none!important;border:0!important}
+.sym-icon svg{display:block}
+.lg-sym{width:18px;height:18px;display:grid;place-items:center}
+
+/* Zona de carga */
+.drop{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:18px 12px;border:1.5px dashed rgba(16,185,129,.45);border-radius:12px;background:rgba(16,185,129,.05);cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
+.drop:hover,.drop.over{background:rgba(16,185,129,.12);border-color:var(--em)}
+.drop .ic{width:26px;height:26px;color:var(--em)}
+.drop strong{font-size:13.5px;color:var(--em-txt)}
+.drop small{font-size:11.5px;color:var(--muted)}
+
+/* Listas de lotes */
+.lot-list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.lot-item{display:flex;align-items:center;gap:4px;padding:4px 4px 4px 0;border:1px solid var(--line);border-radius:10px;background:rgba(2,6,23,.35)}
+.lot-item.editing{border-color:rgba(34,211,238,.5);background:rgba(34,211,238,.06)}
+.lot-main{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:0;background:transparent;color:var(--txt);padding:7px 10px;cursor:pointer;text-align:left;border-radius:8px}
+.lot-main:hover .lot-name{color:var(--neon)}
+.lot-name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:flex;align-items:center;gap:6px}
+.lot-name .ic{width:13px;height:13px;color:var(--em)}
+.lot-meta{font:500 11px var(--mono);color:var(--muted)}
+.empty{font-size:12px;color:var(--dim);padding:12px;border:1px dashed var(--line2);border-radius:10px;text-align:center}
+.export-bar{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.export-bar>span{font-size:11.5px;color:var(--muted);margin-right:2px}
+
+/* Puntos del lote en edición */
+.pts-head{display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px;font-size:12px;font-weight:600;color:#cbd5e1}
+.pts-head .mono{color:var(--em-txt);background:var(--em-soft);padding:2px 8px;border-radius:99px;font-size:11px}
+.pt-list{list-style:none;margin:0 0 10px;padding:0;max-height:240px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;background:rgba(2,6,23,.4)}
+.pt-list li{display:flex;align-items:center;gap:8px;padding:5px 6px 5px 10px;border-bottom:1px solid var(--line);font-size:12px}
+.pt-list li:last-child{border-bottom:0}
+.pt-n{min-width:26px;height:22px;padding:0 6px;border-radius:6px;display:grid;place-items:center;background:rgba(34,211,238,.14);color:#67e8f9;font:700 11px var(--mono)}
+.pt-c{flex:1;min-width:0;font:500 11.5px var(--mono);color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pt-a{font:600 11px var(--mono);color:var(--em-txt);white-space:nowrap}
+.pt-a.bad{color:#fbbf24}
+.pt-empty{padding:14px;text-align:center;color:var(--dim);font-size:12px}
+.gps-status{margin-top:8px;padding:8px 10px;border-radius:9px;font:500 12px var(--mono);background:rgba(34,211,238,.08);color:#a5f3fc;border:1px solid rgba(34,211,238,.25)}
+.gps-status.ok{background:var(--em-soft);color:var(--em-txt);border-color:rgba(16,185,129,.3)}
+.gps-status.warn{background:rgba(245,158,11,.1);color:#fcd34d;border-color:rgba(245,158,11,.35)}
+.gps-status.err{background:rgba(239,68,68,.1);color:#fca5a5;border-color:rgba(239,68,68,.35);font-family:var(--font)}
+.note{font-size:12px;color:#a5f3fc;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.25);border-radius:9px;padding:7px 10px;margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.link{background:none;border:0;color:#67e8f9;text-decoration:underline;cursor:pointer;font:600 12px var(--font);padding:0}
+.alert{font-size:12px;border-radius:10px;padding:9px 10px;margin-top:10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.35);color:#fde68a}
+.alert ul{margin:4px 0 0;padding-left:18px}
+.alert .row{justify-content:space-between}
+
+.process-box{border:1px solid rgba(16,185,129,.35);background:linear-gradient(180deg,rgba(16,185,129,.1),rgba(16,185,129,.02));border-radius:16px;padding:14px;margin-bottom:10px}
+.process-box p{margin:8px 0 0;font-size:12px;color:var(--muted);text-align:center}
+.side-foot{padding:6px 2px 4px;display:flex;flex-direction:column;gap:8px}
+.side-foot small{color:var(--dim);font-size:11px;text-align:center}
+.usage{font:500 11px var(--mono);color:var(--dim);margin-top:8px}
+
+/* ---------- Mapa ---------- */
+.map-wrap{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line);background:var(--bg2);min-height:300px;box-shadow:0 20px 50px -20px rgba(0,0,0,.6)}
+#map{position:absolute;inset:0;background:var(--bg2)}
+.map-fallback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:24px;color:var(--muted);
+  background:repeating-linear-gradient(45deg,rgba(148,163,184,.03) 0 12px,transparent 12px 24px),var(--bg2)}
+.map-fallback .ic{width:38px;height:38px;color:var(--dim)}
+.map-fallback strong{color:var(--txt);font-size:15px}
+.map-tools{position:absolute;top:12px;right:12px;z-index:500;display:flex;flex-direction:column;gap:6px}
+.map-tools .icon-btn{width:38px;height:38px;background:rgba(15,23,42,.85);border:1px solid var(--line2);color:var(--txt);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.map-tools .icon-btn:hover{background:var(--panel)}
+.map-tools .icon-btn.on{color:var(--neon);border-color:rgba(250,204,21,.55);box-shadow:0 0 0 1px rgba(250,204,21,.25) inset}
+.legend{position:absolute;left:12px;bottom:24px;z-index:500;background:rgba(15,23,42,.85);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid var(--line2);border-radius:10px;padding:8px 10px;font-size:11.5px;display:flex;flex-direction:column;gap:5px}
+.legend span{display:flex;align-items:center;gap:8px}
+.lg-line{width:18px;height:3px;background:var(--neon);border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.lg-dot{width:11px;height:11px;border-radius:50%;border:2px solid #fff}
+.leaflet-container{font-family:var(--font);background:var(--bg2)}
+.leaflet-control-zoom a{background:rgba(15,23,42,.9)!important;color:var(--txt)!important;border-color:var(--line2)!important}
+.leaflet-control-attribution{background:rgba(15,23,42,.75)!important;color:var(--muted)!important;font-size:10px!important}
+.leaflet-control-attribution a{color:var(--em-txt)!important}
+.leaflet-control-scale-line{background:rgba(15,23,42,.75);color:var(--txt);border-color:var(--txt)}
+.leaflet-tooltip.pt-label{background:transparent;border:0;box-shadow:none;color:#fff;font:700 12px var(--font);padding:0 2px;text-shadow:0 0 3px #000,0 0 3px #000,0 0 2px #000}
+.leaflet-tooltip.pt-label::before{display:none}
+.leaflet-tooltip.lot-tip{background:rgba(15,23,42,.95);color:var(--neon);border:1px solid rgba(250,204,21,.4);font:600 12px var(--font);border-radius:7px;box-shadow:0 6px 16px rgba(0,0,0,.4)}
+.leaflet-tooltip.lot-tip::before{display:none}
+
+/* ---------- Galería ---------- */
+#tab-galeria{overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.gal-toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 16px;margin-bottom:16px}
+.gal-toolbar h2{margin:0;font-size:17px;letter-spacing:-.01em}
+.gal-toolbar p{margin:2px 0 0;font-size:12px;color:var(--muted)}
+.gal-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.gal-actions .sep{width:1px;height:26px;background:var(--line2);margin:0 2px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px}
+.cap-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 14px 34px -18px rgba(0,0,0,.7);transition:transform .15s,border-color .15s}
+.cap-card:hover{transform:translateY(-2px);border-color:rgba(16,185,129,.45)}
+.cap-thumb{position:relative;border:0;padding:0;margin:0;background:#000;cursor:zoom-in;display:block;aspect-ratio:4/3;overflow:hidden}
+.cap-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.cap-thumb .badge{position:absolute;top:10px;left:10px;font:600 11px var(--mono);background:rgba(15,23,42,.85);color:var(--neon);padding:3px 8px;border-radius:6px;border:1px solid rgba(250,204,21,.35)}
+.cap-thumb .zoom{position:absolute;right:10px;bottom:10px;width:32px;height:32px;border-radius:8px;background:rgba(15,23,42,.8);color:#fff;display:grid;place-items:center;opacity:0;transition:.15s}
+.cap-card:hover .zoom{opacity:1}
+.cap-body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px}
+.cap-body h3{margin:0;font-size:14.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cap-body .meta{font:500 11px var(--mono);color:var(--muted);margin-top:2px}
+.gal-empty{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:60px 20px;color:var(--muted)}
+.gal-empty .ic{width:44px;height:44px;color:var(--dim)}
+.gal-empty strong{color:var(--txt);font-size:16px}
+
+/* ---------- Modales ---------- */
+.modal{position:fixed;inset:0;z-index:2000;display:none;align-items:center;justify-content:center;background:rgba(2,6,23,.75);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);padding:16px;padding-top:calc(16px + var(--sat))}
+.modal.open{display:flex;animation:fade .15s}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.modal-card{background:var(--panel);border:1px solid var(--line2);border-radius:18px;width:100%;max-width:860px;max-height:calc(100dvh - 32px - var(--sat));display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.modal-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.modal-head h2{margin:0;font-size:16px;flex:1}
+.modal-body{padding:16px 18px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.modal-foot{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
+.confirm-card{max-width:440px}
+.confirm-card p{margin:0;color:#cbd5e1;font-size:13.5px;white-space:pre-line}
+.g-sec{margin-bottom:26px}
+.g-sec h3{display:flex;align-items:center;gap:10px;font-size:15px;margin:0 0 6px}
+.g-n{width:26px;height:26px;border-radius:8px;background:var(--em);color:#04231a;display:grid;place-items:center;font:800 12px var(--mono);flex:none}
+.g-sec p{margin:0 0 8px;color:#cbd5e1;font-size:13.5px}
+.g-sec ol{margin:0 0 10px;padding-left:22px;color:var(--txt);font-size:13.5px}
+.g-sec li{margin:4px 0}
+.g-tip{font-size:13px;background:var(--em-soft);border:1px solid rgba(16,185,129,.3);border-left:4px solid var(--em);color:#d1fae5;padding:9px 12px;border-radius:9px;margin-bottom:10px}
+.g-fig{width:100%;border-radius:12px;border:1px solid var(--line2);display:block;background:#f8fafc}
+.lb-card{max-width:min(1400px,100%);background:#020617}
+.lb-card img{display:block;max-width:100%;max-height:calc(100dvh - 120px - var(--sat));margin:0 auto;object-fit:contain}
+
+/* ---------- Progreso y avisos ---------- */
+.progress-card{position:fixed;left:50%;bottom:calc(20px + var(--sab));transform:translateX(-50%);z-index:1500;width:min(460px,calc(100% - 24px));
+  background:rgba(15,23,42,.96);border:1px solid rgba(16,185,129,.45);border-radius:16px;padding:14px 16px;box-shadow:0 24px 60px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:10px}
+.pc-head{display:flex;gap:12px;align-items:center}
+.pc-head strong{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-head small{display:block;color:var(--muted);font-size:11.5px}
+.spin{width:22px;height:22px;border-radius:50%;border:3px solid rgba(16,185,129,.25);border-top-color:var(--em);animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.bar{height:8px;border-radius:99px;background:rgba(148,163,184,.15);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#10b981,#facc15);border-radius:99px;transition:width .25s}
+.toasts{position:fixed;top:calc(74px + var(--sat));right:16px;z-index:3000;display:flex;flex-direction:column;gap:8px;width:min(380px,calc(100% - 32px));pointer-events:none}
+.toast{pointer-events:auto;display:flex;gap:10px;align-items:flex-start;background:rgba(15,23,42,.97);border:1px solid var(--line2);border-left:4px solid var(--em);border-radius:11px;padding:10px 8px 10px 12px;font-size:13px;box-shadow:0 16px 40px rgba(0,0,0,.5);animation:tin .2s ease-out}
+.toast>div{flex:1}
+.toast .ic{margin-top:1px;color:var(--em)}
+.toast.t-warn{border-left-color:var(--warn)}.toast.t-warn>.ic{color:var(--warn)}
+.toast.t-error{border-left-color:var(--err)}.toast.t-error>.ic{color:var(--err)}
+.toast.t-info{border-left-color:var(--cyan)}.toast.t-info>.ic{color:var(--cyan)}
+.toast.out{opacity:0;transform:translateX(20px);transition:.25s}
+.t-x{background:none;border:0;color:var(--dim);cursor:pointer;padding:0 2px}
+.t-x .ic{width:15px;height:15px}
+@keyframes tin{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
+/* ---------- Adaptación a celular ---------- */
+@media (max-width:1100px){ .brand p{display:none} .hide-md{display:none} }
+@media (max-width:900px){
+  body{overflow:auto;height:auto}
+  main{flex:none}
+  .topbar{flex-wrap:wrap;gap:10px;padding:10px 12px;padding-top:calc(10px + var(--sat));position:sticky;top:0}
+  .tabs{order:3;width:100%;margin:0}
+  .tab{flex:1;justify-content:center;padding:10px 8px}
+  .tab .long{display:none}.tab .short{display:inline}
+  .top-actions{margin-left:auto}
+  .hide-sm{display:none}
+  #tab-visor.active{display:flex;flex-direction:column;height:auto;padding:10px}
+  .side{overflow:visible;padding:10px}
+  .map-wrap{height:62vh;min-height:340px}
+  #tab-galeria{overflow:visible;padding:10px}
+  .grid{grid-template-columns:1fr}
+  .checks{grid-template-columns:1fr}
+  .toasts{top:auto;bottom:calc(16px + var(--sab));right:12px;left:12px;width:auto}
+  .modal{padding:8px;padding-top:calc(8px + var(--sat))}
+  .modal-card{max-height:calc(100dvh - 16px - var(--sat))}
+  .gal-actions .sep{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ============================ CABECERA ============================ -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-ic" data-i="sprout"></div>
+    <div><h1>AgroField Capture</h1><p>Muestreo de suelos · Visor GIS · Colector de campo</p></div>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Secciones">
+    <button class="tab active" role="tab" aria-selected="true" data-tab="visor"><span data-i="map"></span><span class="long">Visor y Procesamiento GIS</span><span class="short">Visor y campo</span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="galeria"><span data-i="image"></span><span class="long">Galería de Capturas y Exportación</span><span class="short">Galería</span><span class="count" id="capCount">0</span></button>
+  </nav>
+  <div class="top-actions">
+    <span id="connBadge" class="conn">En línea</span>
+    <button id="btnHelp" class="btn btn-ghost btn-sm" type="button"><span data-i="help"></span><span class="hide-sm">Guía de Usuario</span></button>
+  </div>
+</header>
+
+<div id="offlineBanner" class="offline-banner" role="status" hidden>
+  <span data-i="wifiOff"></span><strong>Sin conexión</strong>
+  <span>Puedes seguir capturando y guardando puntos GPS. El mapa satelital y el procesamiento de imágenes requieren internet.</span>
+</div>
+
+<main>
+<!-- ======================= PESTAÑA 1: VISOR ======================= -->
+<section id="tab-visor" class="tab-panel active" role="tabpanel">
+  <aside class="side glass">
+
+    <!-- Flujo 1: Importación QGIS -->
+    <details class="sec" id="secImport" open>
+      <summary><span class="sec-ic" data-i="upload"></span>Importar desde QGIS (.geojson)<span class="pill" id="impCount">0</span><span class="chev" data-i="chev"></span></summary>
+      <div class="sec-body">
+        <p class="hint">Archivos en EPSG:4326 con polígonos, puntos o ambos. El nombre del lote se toma del campo <b>lote</b>.</p>
+        <label class="drop" id="dropZone">
+          <input type="file" id="fileInput" multiple hidden>
+          <span data-i="upload"></span>
+          <strong>Seleccionar archivos .geojson</strong>
+          <small>o arrástralos aquí · se pueden cargar varios a la vez</small>
+        </label>
+        <div id="importWarnings"></div>
+        <ul class="lot-list" id="importedList"></ul>
+      </div>
+    </details>
+
+    <!-- Flujo 2: Colector GPS -->
+    <details class="sec" id="secGps" open>
+      <summary><span class="sec-ic" data-i="crosshair"></span>Colector GPS de campo<span class="chev" data-i="chev"></span></summary>
+      <div class="sec-body">
+        <label class="lbl" for="lotName">Nombre del lote</label>
+        <input id="lotName" class="inp" type="text" placeholder="Ej.: Lote La Tranquera" autocomplete="off" autocapitalize="words" enterkeyhint="done">
+        <div id="editingNote" class="note" hidden><span data-i="pencil"></span><span>Editando un lote guardado.</span><button class="link" type="button" id="btnCancelEdit">Cancelar edición</button></div>
+        <div style="height:10px"></div>
+        <button id="btnCapture" class="btn btn-lg btn-capture w-full" type="button"><span data-i="crosshair"></span><span class="txt">Capturar Punto GPS Actual</span></button>
+        <div id="gpsStatus" class="gps-status" hidden></div>
+        <div class="pts-head"><span>Puntos del lote</span><span class="mono" id="draftCount">0</span></div>
+        <ol class="pt-list" id="draftPoints"></ol>
+        <div class="row">
+          <button id="btnSaveLot" class="btn btn-outline grow" type="button"><span data-i="save"></span><span>Guardar Lote en Memoria Local</span></button>
+          <button id="btnNewLot" class="icon-btn" type="button" title="Empezar un lote nuevo" aria-label="Empezar un lote nuevo" style="width:42px;height:42px;border:1px solid var(--line2)"><span data-i="plus"></span></button>
+        </div>
+      </div>
+    </details>
+
+    <!-- Lotes guardados en campo -->
+    <details class="sec" id="secField" open>
+      <summary><span class="sec-ic" data-i="database"></span>Lotes guardados en campo<span class="pill" id="fieldCount">0</span><span class="chev" data-i="chev"></span></summary>
+      <div class="sec-body">
+        <ul class="lot-list" id="fieldList"></ul>
+        <div class="export-bar" id="fieldExport">
+          <span>Descargar todos:</span>
+          <button class="btn btn-ghost btn-sm" type="button" data-exp-field="geojson"><span data-i="download"></span>GeoJSON</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-exp-field="csv"><span data-i="download"></span>CSV</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-exp-field="kml"><span data-i="download"></span>KML</button>
+        </div>
+      </div>
+    </details>
+
+    <!-- Configuración -->
+    <details class="sec" id="secCfg">
+      <summary><span class="sec-ic" data-i="sliders"></span>Configuración de capturas<span class="chev" data-i="chev"></span></summary>
+      <div class="sec-body">
+        <label class="lbl" for="bufRange"><span>Margen alrededor del lote (buffer)</span><span class="mono" id="bufVal" style="color:var(--neon)">250 m</span></label>
+        <input type="range" id="bufRange" min="100" max="500" step="50" value="250">
+        <div class="range-scale"><span>100 m</span><span>250 m</span><span>500 m</span></div>
+        <label class="lbl">Formato de imagen</label>
+        <div class="seg" id="fmtSeg">
+          <button type="button" data-fmt="16:9">Panorámico 16:9<small>1920 × 1080</small></button>
+          <button type="button" data-fmt="4:3">Clásico 4:3<small>2048 × 1536</small></button>
+        </div>
+        <label class="lbl">Símbolo de los puntos de muestreo</label>
+        <div class="symgrid" id="symSeg"></div>
+        <label class="lbl" for="symSizeRange"><span>Tamaño del símbolo</span><span class="mono" id="symSizeVal" style="color:var(--neon)">100 %</span></label>
+        <div class="row">
+          <input type="range" id="symSizeRange" min="50" max="250" step="10" value="100" class="grow">
+          <span class="sym-size-prev" id="symSizePrev" aria-hidden="true"></span>
+        </div>
+        <div class="range-scale" style="padding-right:72px"><span>50 %</span><span>250 %</span></div>
+        <label class="lbl">Elementos en la imagen</label>
+        <div class="checks" id="elChecks"></div>
+      </div>
+    </details>
+
+    <!-- Procesamiento -->
+    <div class="process-box">
+      <button id="btnProcess" class="btn btn-process" type="button"><span data-i="play"></span>Procesar Todos los Lotes y Generar Capturas</button>
+      <p id="processInfo">No hay lotes cargados.</p>
+    </div>
+
+    <!-- Datos locales -->
+    <details class="sec" id="secData">
+      <summary><span class="sec-ic" data-i="archive"></span>Datos locales y respaldo<span class="chev" data-i="chev"></span></summary>
+      <div class="sec-body">
+        <p class="hint">Los datos se guardan solo en este dispositivo. Descarga un respaldo al volver del campo o para pasar los lotes del celular a la PC.</p>
+        <div class="row wrap">
+          <button id="btnBackup" class="btn btn-ghost btn-sm grow" type="button"><span data-i="download"></span>Descargar respaldo</button>
+          <label class="btn btn-ghost btn-sm grow" for="restoreInput"><span data-i="restore"></span>Restaurar respaldo</label>
+          <input type="file" id="restoreInput" hidden>
+        </div>
+        <div style="height:8px"></div>
+        <button id="btnClearAll" class="btn btn-danger btn-sm w-full" type="button"><span data-i="trash"></span>Limpiar toda la base local</button>
+        <div class="usage" id="usage"></div>
+      </div>
+    </details>
+
+    <div class="side-foot">
+      <button class="btn btn-ghost w-full" type="button" data-act-pdf><span data-i="file"></span>Descargar Guía de Usuario (PDF)</button>
+      <small id="verInfo"></small>
+    </div>
+  </aside>
+
+  <div class="map-wrap">
+    <div id="map" aria-label="Mapa satelital"></div>
+    <div id="mapFallback" class="map-fallback" hidden>
+      <span data-i="globe"></span>
+      <strong>El mapa satelital no está disponible</strong>
+      <span>Necesita conexión a internet. El colector GPS funciona igual: captura y guarda tus puntos.</span>
+    </div>
+    <div class="map-tools" id="mapTools" hidden>
+      <button class="icon-btn" type="button" id="btnFitAll" title="Ver todos los lotes" aria-label="Ver todos los lotes"><span data-i="maximize"></span></button>
+      <button class="icon-btn" type="button" id="btnLocate" title="Mi ubicación" aria-label="Mi ubicación"><span data-i="pin"></span></button>
+      <button class="icon-btn" type="button" id="btnRef" title="Límites y localidades" aria-label="Mostrar u ocultar límites y localidades"><span data-i="layers"></span></button>
+    </div>
+    <div class="legend" id="legend" hidden>
+      <span><i class="lg-line"></i>Polígono del lote</span>
+      <span><i class="lg-sym" id="lgSym"></i>Punto de muestreo</span>
+      <span><i class="lg-dot" style="background:#22d3ee"></i>Lote en edición</span>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= PESTAÑA 2: GALERÍA ======================= -->
+<section id="tab-galeria" class="tab-panel" role="tabpanel">
+  <div class="gal-toolbar glass">
+    <div>
+      <h2>Galería de capturas</h2>
+      <p id="galInfo">Todavía no hay imágenes procesadas.</p>
+    </div>
+    <div class="gal-actions">
+      <button id="btnZip" class="btn btn-primary" type="button"><span data-i="archive"></span>Descargar Todo en ZIP (.zip)</button>
+      <span class="sep"></span>
+      <button class="btn btn-ghost btn-sm" type="button" data-exp-all="geojson" title="Todos los lotes en GeoJSON"><span data-i="download"></span>GeoJSON</button>
+      <button class="btn btn-ghost btn-sm" type="button" data-exp-all="csv" title="Todos los puntos en CSV"><span data-i="download"></span>CSV</button>
+      <button class="btn btn-ghost btn-sm" type="button" data-exp-all="kml" title="Todos los lotes en KML (Google Earth)"><span data-i="download"></span>KML</button>
+      <button id="btnClearGallery" class="btn btn-danger btn-sm" type="button" title="Borrar todas las imágenes"><span data-i="trash"></span><span class="hide-md">Borrar imágenes</span></button>
+    </div>
+  </div>
+  <div class="grid" id="galleryGrid"></div>
+</section>
+</main>
+
+<!-- ============================ MODALES ============================ -->
+<div class="modal" id="helpModal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+  <div class="modal-card">
+    <div class="modal-head"><span data-i="help" style="color:var(--em)"></span><h2 id="helpTitle">Guía de Usuario</h2><button class="icon-btn" type="button" data-close aria-label="Cerrar"><span data-i="x"></span></button></div>
+    <div class="modal-body" id="helpBody"></div>
+    <div class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cerrar</button><button class="btn btn-primary" type="button" data-act-pdf><span data-i="file"></span>Descargar Guía en PDF</button></div>
+  </div>
+</div>
+
+<div class="modal" id="confirmModal" role="alertdialog" aria-modal="true" aria-labelledby="cfTitle">
+  <div class="modal-card confirm-card">
+    <div class="modal-head"><span data-i="alert" style="color:var(--warn)"></span><h2 id="cfTitle">Confirmar</h2></div>
+    <div class="modal-body"><p id="cfMsg"></p></div>
+    <div class="modal-foot"><button class="btn btn-ghost" type="button" id="cfCancel">Cancelar</button><button class="btn btn-primary" type="button" id="cfOk">Aceptar</button></div>
+  </div>
+</div>
+
+<div class="modal" id="lightbox" role="dialog" aria-modal="true" aria-labelledby="lbTitle">
+  <div class="modal-card lb-card">
+    <div class="modal-head"><span data-i="image" style="color:var(--neon)"></span><h2 id="lbTitle"></h2>
+      <button class="btn btn-primary btn-sm" type="button" id="lbDownload"><span data-i="download"></span>Descargar JPG</button>
+      <button class="icon-btn" type="button" data-close aria-label="Cerrar"><span data-i="x"></span></button></div>
+    <img id="lbImg" alt="">
+  </div>
+</div>
+
+<div class="progress-card" id="progress" hidden>
+  <div class="pc-head"><span class="spin"></span><div style="min-width:0;flex:1"><strong id="pcTitle">Procesando…</strong><small id="pcDetail" class="mono"></small></div></div>
+  <div class="bar"><i id="pcBar"></i></div>
+  <button class="btn btn-ghost btn-sm" type="button" id="pcCancel">Cancelar</button>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<!-- ======================= LIBRERÍAS (CDN) ======================= -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<!-- ========================= APLICACIÓN ========================= -->
+<script>
+(function(){
+'use strict';
+
+/* =====================================================================
+   1. CONSTANTES Y CONFIGURACIÓN
+   ===================================================================== */
+const APP_VERSION = '1.3.0';
+// blankTile=false: pide a Esri un error (en vez del mosaico gris "Map data not yet available") cuando no hay imagen a ese zoom
+const ESRI_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?blankTile=false';
+const ESRI_ATTR = 'Imágenes: Esri, Maxar, Earthstar Geographics y la comunidad de usuarios SIG';
+const MAX_TILE_Z = 18;            // zoom máximo de mosaicos para las capturas
+const MAX_NATIVE_Z = 19;          // zoom máximo que se pide a Esri en el visor
+const MAX_FALLBACK = 6;           // cuántos niveles de zoom se retrocede si no hay imagen
+// Capa de referencia de Esri: límites de países y provincias + nombres de localidades (fondo transparente)
+const REF_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
+const TILE_CONCURRENCY = 8;
+/* Símbolos para los puntos de muestreo (tamaño regulable en %) */
+const SYM_SIZE_MIN = 50, SYM_SIZE_MAX = 250;
+const SYMBOLS = [
+  { id: 'circle', label: 'Círculo verde' },
+  { id: 'pin', label: 'Marcador rojo' },
+  { id: 'target', label: 'Mira de precisión' },
+  { id: 'triangle', label: 'Triángulo naranja' }
+];
+const FORMATS = { '16:9': { w: 1920, h: 1080 }, '4:3': { w: 2048, h: 1536 } };
+const LS = { field: 'ms_field_lots_v1', draft: 'ms_draft_v1', settings: 'ms_settings_v1' };
+const EL_LABELS = [
+  ['outline', 'Contorno del polígono'], ['points', 'Puntos de muestreo'], ['labels', 'Números de los puntos'],
+  ['name', 'Nombre del lote'], ['north', 'Flecha de norte'], ['scale', 'Escala gráfica'],
+  ['date', 'Fecha'], ['center', 'Coordenadas del centro']
+];
+const DEFAULT_EL = { outline: true, points: true, labels: true, name: true, north: true, scale: true, date: true, center: true };
+const LOT_KEYS = ['lote'];
+const NUM_KEYS = ['punto', 'numero', 'nro', 'num', 'muestra', 'n', 'id'];
+const ACC_WARN = 10;              // metros: umbral del aviso de precisión baja
+
+/* =====================================================================
+   2. UTILIDADES
+   ===================================================================== */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad = n => String(n).padStart(2, '0');
+const fmtDate = d => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+const fmtDateTime = d => `${fmtDate(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const stamp = () => { const d = new Date(); return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`; };
+const slug = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || 'lote';
+const normName = s => String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+const normKey = k => String(k).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const round = (v, d) => { const f = Math.pow(10, d); return Math.round(v * f) / f; };
+const fmtBytes = b => b > 1048576 ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+const fmtDist = m => m >= 1000 ? (m / 1000).toString().replace('.', ',') + ' km' : m + ' m';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const sortByName = (a, b) => String(a.name).localeCompare(String(b.name), 'es', { numeric: true, sensitivity: 'base' });
+
+/* Íconos SVG embebidos (trazos estilo Lucide, disponibles sin conexión) */
+const ICONS = {
+  sprout: '<path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>',
+  map: '<polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/>',
+  image: '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+  help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+  upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
+  crosshair: '<circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/>',
+  save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+  pencil: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
+  pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  sliders: '<line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/>',
+  play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+  archive: '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
+  chev: '<path d="m6 9 6 6 6-6"/>',
+  eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  wifiOff: '<path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M19 12.859a10 10 0 0 0-2.007-1.523"/><path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/><path d="m2 2 20 20"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  restore: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  maximize: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  zoom: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6"/><path d="M8 11h6"/>',
+  layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>'
+};
+function icon(name) {
+  return `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+}
+function hydrateIcons(root = document) {
+  $$('[data-i]', root).forEach(el => {
+    if (el.dataset.done) return;
+    el.insertAdjacentHTML('afterbegin', icon(el.dataset.i));
+    el.dataset.done = '1';
+  });
+}
+
+/* Avisos emergentes */
+function toast(msg, type = 'info', ms) {
+  const box = $('#toasts');
+  const el = document.createElement('div');
+  el.className = 'toast t-' + type;
+  const ic = { info: 'help', success: 'check', warn: 'alert', error: 'alert' }[type] || 'help';
+  el.innerHTML = `${icon(ic)}<div>${esc(msg)}</div><button class="t-x" type="button" aria-label="Cerrar">${icon('x')}</button>`;
+  box.appendChild(el);
+  while (box.children.length > 4) box.firstChild.remove();
+  const kill = () => { el.classList.add('out'); setTimeout(() => el.remove(), 260); };
+  el.querySelector('.t-x').onclick = kill;
+  setTimeout(kill, ms || (type === 'error' ? 9000 : 4800));
+}
+
+/* Diálogo de confirmación */
+function confirmDialog({ title, message, okText = 'Aceptar', cancelText = 'Cancelar', danger = false }) {
+  return new Promise(resolve => {
+    const m = $('#confirmModal'), ok = $('#cfOk'), cancel = $('#cfCancel');
+    $('#cfTitle').textContent = title;
+    $('#cfMsg').textContent = message;
+    ok.textContent = okText;
+    ok.className = 'btn ' + (danger ? 'btn-danger-solid' : 'btn-primary');
+    cancel.textContent = cancelText;
+    const done = v => { m.classList.remove('open'); ok.onclick = cancel.onclick = m.onclick = null; document.removeEventListener('keydown', onKey); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') done(false); };
+    ok.onclick = () => done(true);
+    cancel.onclick = () => done(false);
+    m.onclick = e => { if (e.target === m) done(false); };
+    document.addEventListener('keydown', onKey);
+    m.classList.add('open');
+    setTimeout(() => ok.focus(), 30);
+  });
+}
+
+/* Descarga de archivos (FileSaver si está, o enlace temporal) */
+function downloadBlob(blob, filename) {
+  try { if (typeof window.saveAs === 'function') { window.saveAs(blob, filename); return; } } catch (e) { /* sigue con el método alternativo */ }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+function readText(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error || new Error('No se pudo leer el archivo'));
+    r.readAsText(file);
+  });
+}
+
+/* =====================================================================
+   3. ALMACENAMIENTO LOCAL (localStorage para campo, IndexedDB para el resto)
+   ===================================================================== */
+const store = {
+  get(k, def) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch (e) { return def; } },
+  set(k, v) {
+    try { localStorage.setItem(k, JSON.stringify(v)); return true; }
+    catch (e) { toast('No se pudo guardar en la memoria del dispositivo: ' + (e && e.message || e), 'error'); return false; }
+  },
+  del(k) { try { localStorage.removeItem(k); } catch (e) { /* nada */ } }
+};
+const idb = {
+  db: null,
+  open() {
+    if (this.db) return Promise.resolve(this.db);
+    return new Promise((resolve, reject) => {
+      if (!('indexedDB' in window) || !window.indexedDB) { reject(new Error('IndexedDB no disponible')); return; }
+      let req;
+      try { req = indexedDB.open('muestreo_suelos', 1); } catch (e) { reject(e); return; }
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('imported')) db.createObjectStore('imported', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains('captures')) db.createObjectStore('captures', { keyPath: 'id' });
+      };
+      req.onsuccess = () => { this.db = req.result; resolve(this.db); };
+      req.onerror = () => reject(req.error);
+    });
+  },
+  async run(storeName, mode, fn) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, mode);
+      const r = fn(tx.objectStore(storeName));
+      let out;
+      if (r) r.onsuccess = () => { out = r.result; };
+      tx.oncomplete = () => resolve(out);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error('Operación cancelada'));
+    });
+  },
+  all(s) { return this.run(s, 'readonly', st => st.getAll()); },
+  put(s, v) { return this.run(s, 'readwrite', st => st.put(v)); },
+  del(s, k) { return this.run(s, 'readwrite', st => st.delete(k)); },
+  clear(s) { return this.run(s, 'readwrite', st => st.clear()); }
+};
+
+/* =====================================================================
+   4. ESTADO DE LA APLICACIÓN
+   ===================================================================== */
+const newDraft = () => ({ id: null, name: '', points: [], nextNum: 1, dirty: false });
+const state = {
+  settings: null,
+  fieldLots: [],      // lotes colectados con GPS (localStorage)
+  importedLots: [],   // lotes importados de QGIS (IndexedDB)
+  captures: [],       // imágenes procesadas (IndexedDB)
+  draft: newDraft(),  // lote en carga/edición en el colector
+  processing: false,
+  cancel: false,
+  map: null,
+  layers: null
+};
+function loadSettings() {
+  const saved = store.get(LS.settings, {}) || {};
+  const s = { buffer: 250, format: '4:3', symbol: 'circle', el: Object.assign({}, DEFAULT_EL, saved.el || {}) };
+  if (Number.isFinite(+saved.buffer)) s.buffer = Math.min(500, Math.max(100, +saved.buffer));
+  if (FORMATS[saved.format]) s.format = saved.format;
+  if (SYMBOLS.some(x => x.id === saved.symbol)) s.symbol = saved.symbol;
+  s.ref = saved.ref !== false; // límites y localidades visibles por defecto
+  s.symSize = Number.isFinite(+saved.symSize) ? Math.min(SYM_SIZE_MAX, Math.max(SYM_SIZE_MIN, +saved.symSize)) : 100; // % del tamaño base
+  return s;
+}
+const saveSettings = () => store.set(LS.settings, state.settings);
+const saveField = () => store.set(LS.field, state.fieldLots);
+const saveDraft = () => store.set(LS.draft, state.draft);
+
+/* Todos los lotes en un formato común para procesar/exportar */
+function normField(l) { return { id: l.id, name: l.name, source: 'gps', polygon: null, points: l.points || [] }; }
+function normImported(l) { return { id: l.id, name: l.name, source: 'geojson', polygon: l.polygon || null, points: l.points || [] }; }
+function allLots() {
+  return [...state.importedLots.map(normImported), ...state.fieldLots.map(normField)].sort(sortByName);
+}
+
+/* =====================================================================
+   5. GEOMETRÍA (proyección Web Mercator, bbox, punto en polígono)
+   ===================================================================== */
+function project(lat, lng, z) {
+  const s = 256 * Math.pow(2, z);
+  const sin = Math.min(Math.max(Math.sin(lat * Math.PI / 180), -0.9999), 0.9999);
+  return { x: (lng + 180) / 360 * s, y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * s };
+}
+function lotFC(lot) {
+  const f = [];
+  if (lot.polygon) f.push({ type: 'Feature', properties: {}, geometry: lot.polygon });
+  (lot.points || []).forEach(p => f.push({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [p.lng, p.lat] } }));
+  return { type: 'FeatureCollection', features: f };
+}
+function rawBBox(fc) {
+  const b = [Infinity, Infinity, -Infinity, -Infinity];
+  const walk = c => {
+    if (typeof c[0] === 'number') { if (c[0] < b[0]) b[0] = c[0]; if (c[1] < b[1]) b[1] = c[1]; if (c[0] > b[2]) b[2] = c[0]; if (c[1] > b[3]) b[3] = c[1]; }
+    else c.forEach(walk);
+  };
+  fc.features.forEach(f => f.geometry && walk(f.geometry.coordinates));
+  return b;
+}
+function coordsOk(c) {
+  if (!Array.isArray(c)) return false;
+  if (typeof c[0] === 'number') return Number.isFinite(c[0]) && Number.isFinite(c[1]) && Math.abs(c[0]) <= 180 && Math.abs(c[1]) <= 90;
+  return c.every(coordsOk);
+}
+function pointInRing(x, y, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function pointInGeom(lng, lat, geom) {
+  if (!geom) return false;
+  const polys = geom.type === 'Polygon' ? [geom.coordinates] : geom.type === 'MultiPolygon' ? geom.coordinates : [];
+  return polys.some(rings => rings.length && pointInRing(lng, lat, rings[0]) && !rings.slice(1).some(h => pointInRing(lng, lat, h)));
+}
+function mergeGeoms(geoms) {
+  if (geoms.length === 1) return geoms[0];
+  const coords = [];
+  geoms.forEach(g => { if (g.type === 'Polygon') coords.push(g.coordinates); else if (g.type === 'MultiPolygon') coords.push(...g.coordinates); });
+  return { type: 'MultiPolygon', coordinates: coords };
+}
+/* Encuadre: bbox del buffer geodésico (Turf) con método alternativo equivalente */
+function computeExtent(lot, meters) {
+  const fc = lotFC(lot);
+  if (window.turf && typeof turf.buffer === 'function') {
+    try {
+      const buf = turf.buffer(fc, meters, { units: 'meters' });
+      const bb = turf.bbox(buf);
+      if (bb.every(Number.isFinite) && bb[2] > bb[0] && bb[3] > bb[1]) return bb;
+    } catch (e) { console.warn('Turf buffer falló, se usa el método alternativo', e); }
+  }
+  const bb = rawBBox(fc);
+  const midLat = (bb[1] + bb[3]) / 2;
+  const dLat = meters / 111320;
+  const dLng = meters / (111320 * Math.cos(midLat * Math.PI / 180));
+  return [bb[0] - dLng, bb[1] - dLat, bb[2] + dLng, bb[3] + dLat];
+}
+function lotCenter(lot) {
+  if (lot.polygon) {
+    if (window.turf) {
+      try { const c = turf.centerOfMass({ type: 'Feature', properties: {}, geometry: lot.polygon }).geometry.coordinates; if (c.every(Number.isFinite)) return { lng: c[0], lat: c[1] }; }
+      catch (e) { /* alternativo */ }
+    }
+    const bb = rawBBox(lotFC({ polygon: lot.polygon, points: [] }));
+    return { lng: (bb[0] + bb[2]) / 2, lat: (bb[1] + bb[3]) / 2 };
+  }
+  const n = lot.points.length || 1;
+  return { lat: lot.points.reduce((s, p) => s + p.lat, 0) / n, lng: lot.points.reduce((s, p) => s + p.lng, 0) / n };
+}
+/* Plan de mosaicos: zoom fraccional que encuadra el bbox en W×H píxeles */
+function planView(bb, W, H, ztMax = MAX_TILE_Z) {
+  const p1 = project(bb[3], bb[0], 0), p2 = project(bb[1], bb[2], 0);
+  const ew = Math.max(p2.x - p1.x, 1e-12), eh = Math.max(p2.y - p1.y, 1e-12);
+  const z = Math.min(Math.log2(Math.min(W / ew, H / eh)), 21);
+  const zt = Math.max(0, Math.min(ztMax, Math.ceil(z - 1e-9)));
+  const k = Math.pow(2, z - zt);
+  const f = Math.pow(2, z);
+  const ox = (p1.x + p2.x) / 2 * f - W / 2, oy = (p1.y + p2.y) / 2 * f - H / 2;
+  const otx = ox / k, oty = oy / k, n = Math.pow(2, zt);
+  const x0 = Math.floor(otx / 256), x1 = Math.floor((otx + W / k - 1e-6) / 256);
+  const y0 = Math.max(0, Math.floor(oty / 256)), y1 = Math.min(n - 1, Math.floor((oty + H / k - 1e-6) / 256));
+  const tiles = [];
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) tiles.push({ tx, ty, x: ((tx % n) + n) % n });
+  return { z, zt, k, ox, oy, otx, oty, tiles,
+    toPx: (lng, lat) => { const p = project(lat, lng, z); return [p.x - ox, p.y - oy]; } };
+}
+
+/* =====================================================================
+   6. IMPORTACIÓN DE GEOJSON (QGIS)
+   ===================================================================== */
+function getProp(props, names) {
+  if (!props) return undefined;
+  const keys = Object.keys(props);
+  for (const name of names) {
+    for (const k of keys) {
+      if (normKey(k) === name) {
+        const v = props[k];
+        if (v !== null && v !== undefined && String(v).trim() !== '') return v;
+      }
+    }
+  }
+  return undefined;
+}
+function flattenGeoJSON(obj) {
+  const out = [];
+  const push = (geom, props) => {
+    if (!geom || !geom.type) return;
+    if (geom.type === 'GeometryCollection') { (geom.geometries || []).forEach(g => push(g, props)); return; }
+    if (geom.coordinates) out.push({ geometry: geom, properties: props || {} });
+  };
+  if (!obj || typeof obj !== 'object') throw new Error('no contiene datos GeoJSON');
+  if (obj.type === 'FeatureCollection') (obj.features || []).forEach(f => f && push(f.geometry, f.properties));
+  else if (obj.type === 'Feature') push(obj.geometry, obj.properties);
+  else if (obj.type) push(obj, {});
+  else throw new Error('no tiene la estructura de un GeoJSON');
+  return out;
+}
+const isClosed = c => Array.isArray(c) && c.length >= 4 && c[0][0] === c[c.length - 1][0] && c[0][1] === c[c.length - 1][1];
+function cleanNum(v) {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  return /^\d+(\.0+)?$/.test(s) ? String(parseInt(s, 10)) : s;
+}
+function addPoints(lot, arr) {
+  const key = p => p.lat.toFixed(7) + ',' + p.lng.toFixed(7);
+  const seen = new Set(lot.points.map(key));
+  let maxN = lot.points.reduce((m, p) => Math.max(m, Number(p.n) || 0), 0);
+  const fresh = [];
+  arr.slice().sort((a, b) => a.order - b.order).forEach(p => { const k = key(p); if (!seen.has(k)) { seen.add(k); fresh.push(p); } });
+  fresh.forEach(p => { p.n = cleanNum(p.num); if (p.n != null && Number.isFinite(+p.n)) maxN = Math.max(maxN, +p.n); });
+  fresh.forEach(p => { if (p.n == null) p.n = String(++maxN); lot.points.push({ n: p.n, lat: round(p.lat, 7), lng: round(p.lng, 7) }); });
+  return fresh.length;
+}
+async function handleImport(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return null;
+  const warnings = [], polys = [], pts = [];
+  let order = 0;
+  for (const f of files) {
+    let obj;
+    try { obj = JSON.parse(await readText(f)); }
+    catch (e) { warnings.push(`«${f.name}»: no es un archivo GeoJSON válido.`); continue; }
+    const crsName = obj && obj.crs && obj.crs.properties && obj.crs.properties.name;
+    if (crsName && !/4326|CRS84/i.test(crsName)) { warnings.push(`«${f.name}»: está en ${crsName}. Expórtalo de nuevo desde QGIS en EPSG:4326.`); continue; }
+    let feats;
+    try { feats = flattenGeoJSON(obj); } catch (e) { warnings.push(`«${f.name}»: ${e.message}.`); continue; }
+    if (!feats.length) { warnings.push(`«${f.name}»: no contiene geometrías.`); continue; }
+    if (!feats.every(ft => coordsOk(ft.geometry.coordinates))) { warnings.push(`«${f.name}»: las coordenadas no están en grados (EPSG:4326). Expórtalo de nuevo desde QGIS.`); continue; }
+    const base = f.name.replace(/\.(geo)?json$/i, '');
+    let skippedLines = 0, unnamed = 0;
+    feats.forEach(ft => {
+      const g = ft.geometry, props = ft.properties;
+      const loteRaw = getProp(props, LOT_KEYS);
+      const lote = loteRaw != null ? String(loteRaw).trim() : null;
+      const addPoly = geom => { polys.push({ geom, lote, file: base }); if (!lote) unnamed++; };
+      if (g.type === 'Polygon' || g.type === 'MultiPolygon') addPoly(g);
+      else if (g.type === 'LineString') { if (isClosed(g.coordinates)) addPoly({ type: 'Polygon', coordinates: [g.coordinates] }); else skippedLines++; }
+      else if (g.type === 'MultiLineString') g.coordinates.forEach(c => { if (isClosed(c)) addPoly({ type: 'Polygon', coordinates: [c] }); else skippedLines++; });
+      else if (g.type === 'Point') pts.push({ lng: g.coordinates[0], lat: g.coordinates[1], lote, num: getProp(props, NUM_KEYS), file: base, order: order++ });
+      else if (g.type === 'MultiPoint') g.coordinates.forEach(c => pts.push({ lng: c[0], lat: c[1], lote, num: getProp(props, NUM_KEYS), file: base, order: order++ }));
+    });
+    if (skippedLines) warnings.push(`«${f.name}»: se omitieron ${skippedLines} línea(s) abierta(s).`);
+    if (unnamed) warnings.push(`«${f.name}»: ${unnamed} polígono(s) sin campo "lote"; se nombraron con el nombre del archivo.`);
+  }
+
+  // Agrupar polígonos por nombre de lote
+  const batch = new Map();
+  const unnamedCount = {}, unnamedIdx = {};
+  polys.forEach(p => { if (!p.lote) unnamedCount[p.file] = (unnamedCount[p.file] || 0) + 1; });
+  polys.forEach(p => {
+    let name = p.lote;
+    if (!name) {
+      if (unnamedCount[p.file] > 1) { unnamedIdx[p.file] = (unnamedIdx[p.file] || 0) + 1; name = `${p.file} (${unnamedIdx[p.file]})`; }
+      else name = p.file;
+    }
+    const k = normName(name);
+    if (!batch.has(k)) batch.set(k, { name, file: p.file, geoms: [], points: [] });
+    batch.get(k).geoms.push(p.geom);
+  });
+
+  // Asignar puntos: 1) campo "lote"  2) polígono que lo contiene  3) lote solo-puntos
+  const existingAdds = new Map();
+  const addExisting = (lot, p) => { if (!existingAdds.has(lot.id)) existingAdds.set(lot.id, []); existingAdds.get(lot.id).push(p); };
+  pts.forEach(p => {
+    if (p.lote) {
+      const k = normName(p.lote);
+      if (batch.has(k)) { batch.get(k).points.push(p); return; }
+      const ex = state.importedLots.find(l => normName(l.name) === k);
+      if (ex) { addExisting(ex, p); return; }
+    }
+    for (const b of batch.values()) { if (b.geoms.some(g => pointInGeom(p.lng, p.lat, g))) { b.points.push(p); return; } }
+    const ex = state.importedLots.find(l => l.polygon && pointInGeom(p.lng, p.lat, l.polygon));
+    if (ex) { addExisting(ex, p); return; }
+    const name = p.lote || `${p.file} (puntos)`;
+    const k = normName(name);
+    if (!batch.has(k)) batch.set(k, { name, file: p.file, geoms: [], points: [] });
+    batch.get(k).points.push(p);
+  });
+
+  // Fusionar con lo existente (mismo nombre = se actualiza)
+  const now = Date.now();
+  const changed = new Map();
+  let created = 0, updated = 0, addedPts = 0, seq = 0;
+  for (const b of batch.values()) {
+    const k = normName(b.name);
+    let lot = state.importedLots.find(l => normName(l.name) === k);
+    const geom = b.geoms.length ? mergeGeoms(b.geoms) : null;
+    if (lot) { if (geom) lot.polygon = geom; lot.updatedAt = now; updated++; }
+    else {
+      lot = { id: `imp-${now.toString(36)}-${(seq++).toString(36)}`, name: b.name, file: b.file, polygon: geom, points: [], createdAt: now, updatedAt: now };
+      state.importedLots.push(lot); created++;
+    }
+    addedPts += addPoints(lot, b.points);
+    changed.set(lot.id, lot);
+  }
+  for (const [id, arr] of existingAdds) {
+    const lot = state.importedLots.find(l => l.id === id);
+    if (!lot) continue;
+    addedPts += addPoints(lot, arr);
+    lot.updatedAt = now;
+    if (!changed.has(id)) updated++;
+    changed.set(id, lot);
+  }
+  for (const lot of changed.values()) { try { await idb.put('imported', lot); } catch (e) { console.warn('No se pudo guardar en IndexedDB', e); } }
+
+  renderImportWarnings(warnings);
+  renderAll();
+  if (changed.size) {
+    fitLots([...changed.values()].map(normImported));
+    toast(`Importación lista: ${created} lote(s) nuevo(s), ${updated} actualizado(s), ${addedPts} punto(s).`, 'success');
+  } else if (!warnings.length) {
+    toast('Los archivos no contenían lotes ni puntos nuevos.', 'warn');
+  }
+  return { created, updated, addedPts, warnings };
+}
+function renderImportWarnings(list) {
+  const box = $('#importWarnings');
+  if (!list.length) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="alert"><div class="row"><strong>Revisa estos archivos</strong><button class="icon-btn" type="button" data-act="close-warn" aria-label="Cerrar">${icon('x')}</button></div><ul>${list.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`;
+}
+
+/* =====================================================================
+   7. COLECTOR GPS DE CAMPO
+   ===================================================================== */
+let gpsSession = null;
+function setCaptureLabel(t) { $('#btnCapture .txt').textContent = t; }
+function onCaptureClick() {
+  if (gpsSession) { if (gpsSession.best) gpsSession.finish(); return; }
+  if (!('geolocation' in navigator)) { toast('Este dispositivo o navegador no permite usar el GPS.', 'error'); return; }
+  const btn = $('#btnCapture'), st = $('#gpsStatus');
+  const sess = { best: null, watch: null, t1: null, t2: null, done: false, start: Date.now() };
+  gpsSession = sess;
+  btn.classList.add('capturing');
+  setCaptureLabel('Buscando señal GPS…');
+  st.hidden = false; st.className = 'gps-status'; st.textContent = 'Esperando la primera lectura del GPS…';
+  const end = () => {
+    sess.done = true;
+    if (sess.watch != null) try { navigator.geolocation.clearWatch(sess.watch); } catch (e) { /* nada */ }
+    clearTimeout(sess.t1); clearTimeout(sess.t2);
+    gpsSession = null; btn.classList.remove('capturing'); setCaptureLabel('Capturar Punto GPS Actual');
+  };
+  sess.finish = () => { if (sess.done) return; const b = sess.best; end(); if (b) addDraftPoint(b); };
+  sess.fail = err => {
+    if (sess.done) return;
+    end();
+    const msg = {
+      1: 'Permiso de ubicación denegado. En el iPhone: Ajustes > Privacidad y seguridad > Localización > Safari (o "Sitios web de Safari") > "Al usar la app", con "Ubicación exacta" activada.',
+      2: 'No se pudo obtener la posición. Ubícate a cielo abierto y vuelve a intentar.',
+      3: 'El GPS tardó demasiado en responder. Ubícate a cielo abierto y vuelve a intentar.'
+    }[err && err.code] || 'Error de GPS. Vuelve a intentar.';
+    st.className = 'gps-status err'; st.textContent = msg;
+    toast(msg, 'error', 10000);
+  };
+  try {
+    sess.watch = navigator.geolocation.watchPosition(pos => {
+      if (sess.done) return;
+      const c = pos.coords;
+      if (!sess.best || c.accuracy < sess.best.acc) sess.best = { lat: c.latitude, lng: c.longitude, acc: c.accuracy };
+      const a = Math.round(sess.best.acc);
+      st.textContent = `Lectura actual: ±${a} m · toca de nuevo para usarla ya`;
+      setCaptureLabel(`Usar lectura actual (±${a} m)`);
+      if (sess.best.acc <= 5 || Date.now() - sess.start > 8000) sess.finish();
+    }, err => { if (sess.best) sess.finish(); else if (err && err.code !== 3) sess.fail(err); },
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+  } catch (e) { sess.fail({ code: 2 }); return; }
+  sess.t1 = setTimeout(() => { if (sess.best) sess.finish(); }, 8000);
+  sess.t2 = setTimeout(() => { if (sess.best) sess.finish(); else sess.fail({ code: 3 }); }, 35000);
+}
+function addDraftPoint(b) {
+  const d = state.draft;
+  const p = { n: d.nextNum++, lat: round(b.lat, 7), lng: round(b.lng, 7), acc: round(b.acc, 1) };
+  d.points.push(p); d.dirty = true;
+  saveDraft(); renderDraft(); renderMapLots();
+  const st = $('#gpsStatus'); st.hidden = false;
+  if (p.acc > ACC_WARN) { st.className = 'gps-status warn'; st.textContent = `Punto ${p.n} capturado · precisión baja (±${Math.round(p.acc)} m)`; }
+  else { st.className = 'gps-status ok'; st.textContent = `Punto ${p.n} capturado · ±${Math.round(p.acc)} m`; }
+  try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) { /* nada */ }
+  const list = $('#draftPoints'); list.scrollTop = list.scrollHeight;
+}
+async function deleteDraftPoint(n) {
+  const ok = await confirmDialog({ title: 'Borrar punto', message: `¿Borrar el punto ${n} de este lote?\nLos demás puntos conservan su número.`, okText: 'Borrar', danger: true });
+  if (!ok) return;
+  const d = state.draft;
+  d.points = d.points.filter(p => String(p.n) !== String(n));
+  d.dirty = true; saveDraft(); renderDraft(); renderMapLots();
+}
+async function saveFieldLot() {
+  const d = state.draft;
+  const name = $('#lotName').value.trim();
+  if (!name) { toast('Escribe el nombre del lote antes de guardarlo.', 'warn'); $('#lotName').focus(); return; }
+  if (!d.points.length) { toast('Captura al menos un punto antes de guardar el lote.', 'warn'); return; }
+  const dup = state.fieldLots.find(l => l.id !== d.id && normName(l.name) === normName(name));
+  if (dup) {
+    const ok = await confirmDialog({ title: 'Nombre repetido', message: `Ya existe un lote de campo llamado «${dup.name}». ¿Guardar igualmente con el mismo nombre?`, okText: 'Guardar igual' });
+    if (!ok) return;
+  }
+  const now = Date.now();
+  const pts = JSON.parse(JSON.stringify(d.points));
+  let lot = d.id ? state.fieldLots.find(l => l.id === d.id) : null;
+  if (lot) Object.assign(lot, { name, points: pts, nextNum: d.nextNum, updatedAt: now });
+  else { lot = { id: d.id || `gps-${now.toString(36)}`, name, points: pts, nextNum: d.nextNum, createdAt: now, updatedAt: now }; state.fieldLots.push(lot); }
+  if (!saveField()) return;
+  state.draft = newDraft(); saveDraft();
+  $('#gpsStatus').hidden = true;
+  renderAll();
+  toast(`Lote «${name}» guardado en el dispositivo (${pts.length} punto${pts.length === 1 ? '' : 's'}).`, 'success');
+}
+async function resetDraft(askIfDirty = true) {
+  const d = state.draft;
+  if (askIfDirty && d.dirty && (d.points.length || d.name)) {
+    const ok = await confirmDialog({ title: 'Cambios sin guardar', message: 'El lote del colector tiene cambios sin guardar. ¿Descartarlos?', okText: 'Descartar', danger: true });
+    if (!ok) return false;
+  }
+  state.draft = newDraft(); saveDraft();
+  $('#gpsStatus').hidden = true;
+  renderDraft(); renderFieldLots(); renderMapLots();
+  return true;
+}
+async function editFieldLot(id) {
+  const lot = state.fieldLots.find(l => l.id === id);
+  if (!lot) return;
+  const d = state.draft;
+  if (d.id !== id && d.dirty && (d.points.length || d.name)) {
+    const ok = await confirmDialog({ title: 'Cambios sin guardar', message: 'El colector tiene puntos sin guardar. ¿Descartarlos y editar el lote seleccionado?', okText: 'Descartar y editar', danger: true });
+    if (!ok) return;
+  }
+  const maxN = lot.points.reduce((m, p) => Math.max(m, +p.n || 0), 0);
+  state.draft = { id: lot.id, name: lot.name, points: JSON.parse(JSON.stringify(lot.points)), nextNum: Math.max(lot.nextNum || 1, maxN + 1), dirty: false };
+  saveDraft(); renderDraft(); renderFieldLots(); renderMapLots();
+  $('#secGps').open = true;
+  $('#secGps').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  toast(`Editando «${lot.name}»: puedes renombrarlo, borrar puntos o seguir agregando.`, 'info');
+}
+async function deleteFieldLot(id) {
+  const lot = state.fieldLots.find(l => l.id === id);
+  if (!lot) return;
+  const ok = await confirmDialog({ title: 'Eliminar lote', message: `¿Eliminar el lote «${lot.name}» con sus ${lot.points.length} punto(s)? Esta acción no se puede deshacer.`, okText: 'Eliminar', danger: true });
+  if (!ok) return;
+  state.fieldLots = state.fieldLots.filter(l => l.id !== id);
+  saveField();
+  if (state.draft.id === id) { state.draft = newDraft(); saveDraft(); }
+  renderAll();
+  toast('Lote eliminado.', 'success');
+}
+async function deleteImportedLot(id) {
+  const lot = state.importedLots.find(l => l.id === id);
+  if (!lot) return;
+  const ok = await confirmDialog({ title: 'Quitar lote importado', message: `¿Quitar «${lot.name}» de la app? El archivo original de QGIS no se modifica.`, okText: 'Quitar', danger: true });
+  if (!ok) return;
+  state.importedLots = state.importedLots.filter(l => l.id !== id);
+  try { await idb.del('imported', id); } catch (e) { /* nada */ }
+  renderAll();
+}
+
+/* =====================================================================
+   8. EXPORTACIONES (GeoJSON / CSV / KML) Y RESPALDO
+   ===================================================================== */
+function lotsToGeoJSON(lots) {
+  const features = [];
+  lots.forEach(l => {
+    const origen = l.source === 'gps' ? 'GPS de campo' : 'QGIS';
+    if (l.polygon) features.push({ type: 'Feature', properties: { lote: l.name, tipo: 'poligono', origen }, geometry: l.polygon });
+    l.points.forEach(p => {
+      const props = { lote: l.name, punto: p.n, tipo: 'punto', origen };
+      if (p.acc != null) props.precision_m = p.acc;
+      features.push({ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: [round(p.lng, 7), round(p.lat, 7)] } });
+    });
+  });
+  return { type: 'FeatureCollection', name: 'muestreo_suelos', crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:OGC:1.3:CRS84' } }, features };
+}
+function lotsToCSV(lots) {
+  const q = v => { const s = String(v == null ? '' : v); return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const rows = [['lote', 'punto', 'latitud', 'longitud', 'precision_m', 'origen']];
+  lots.forEach(l => l.points.forEach(p => rows.push([l.name, p.n, p.lat.toFixed(7), p.lng.toFixed(7), p.acc != null ? p.acc : '', l.source === 'gps' ? 'GPS de campo' : 'QGIS'])));
+  return '\ufeff' + rows.map(r => r.map(q).join(',')).join('\r\n');
+}
+function lotsToKML(lots) {
+  const x = s => esc(s);
+  const ring = r => r.map(c => `${c[0]},${c[1]},0`).join(' ');
+  const poly = rings => `<Polygon><outerBoundaryIs><LinearRing><coordinates>${ring(rings[0])}</coordinates></LinearRing></outerBoundaryIs>${rings.slice(1).map(h => `<innerBoundaryIs><LinearRing><coordinates>${ring(h)}</coordinates></LinearRing></innerBoundaryIs>`).join('')}</Polygon>`;
+  const folders = lots.map(l => {
+    let pm = '';
+    if (l.polygon) {
+      const geom = l.polygon.type === 'Polygon' ? poly(l.polygon.coordinates) : `<MultiGeometry>${l.polygon.coordinates.map(poly).join('')}</MultiGeometry>`;
+      pm += `<Placemark><name>${x(l.name)}</name><styleUrl>#lote</styleUrl>${geom}</Placemark>`;
+    }
+    pm += l.points.map(p => `<Placemark><name>${x(p.n)}</name><description>${x(l.name)}${p.acc != null ? ' · precisión ±' + p.acc + ' m' : ''}</description><styleUrl>#punto</styleUrl><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`).join('');
+    return `<Folder><name>${x(l.name)}</name>${pm}</Folder>`;
+  }).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>AgroField Capture - Muestreo de suelos</name>` +
+    `<Style id="lote"><LineStyle><color>ff15ccfa</color><width>3</width></LineStyle><PolyStyle><color>2015ccfa</color></PolyStyle></Style>` +
+    `<Style id="punto"><IconStyle><color>ff81b910</color><scale>0.9</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle><LabelStyle><scale>0.9</scale></LabelStyle></Style>` +
+    folders + `</Document></kml>`;
+}
+function exportLots(lots, fmt, baseName) {
+  if (!lots.length) { toast('No hay lotes para exportar.', 'warn'); return; }
+  const name = `${baseName}_${stamp()}`;
+  if (fmt === 'geojson') downloadBlob(new Blob([JSON.stringify(lotsToGeoJSON(lots), null, 1)], { type: 'application/geo+json' }), name + '.geojson');
+  else if (fmt === 'csv') {
+    if (!lots.some(l => l.points.length)) { toast('No hay puntos para exportar en CSV.', 'warn'); return; }
+    downloadBlob(new Blob([lotsToCSV(lots)], { type: 'text/csv;charset=utf-8' }), name + '.csv');
+  }
+  else if (fmt === 'kml') downloadBlob(new Blob([lotsToKML(lots)], { type: 'application/vnd.google-earth.kml+xml' }), name + '.kml');
+}
+function exportBackup() {
+  const data = { app: 'muestreo-suelos', version: 1, exportado: new Date().toISOString(), lotesCampo: state.fieldLots, lotesImportados: state.importedLots, borrador: state.draft };
+  if (!state.fieldLots.length && !state.importedLots.length && !state.draft.points.length) { toast('No hay datos para respaldar.', 'warn'); return; }
+  downloadBlob(new Blob([JSON.stringify(data)], { type: 'application/json' }), `respaldo_muestreo_${stamp()}.json`);
+  toast('Respaldo descargado. Guárdalo en un lugar seguro.', 'success');
+}
+async function importBackup(file) {
+  let data;
+  try { data = JSON.parse(await readText(file)); } catch (e) { toast('El archivo de respaldo no es válido.', 'error'); return; }
+  if (!data || data.app !== 'muestreo-suelos') {
+    if (data && (data.type === 'FeatureCollection' || data.type === 'Feature')) { toast('Ese archivo es un GeoJSON: cárgalo en "Importar desde QGIS".', 'warn'); return; }
+    toast('El archivo no es un respaldo de esta app.', 'error'); return;
+  }
+  let nf = 0, ni = 0;
+  (data.lotesCampo || []).forEach(l => {
+    if (!l || !l.id || !Array.isArray(l.points)) return;
+    const i = state.fieldLots.findIndex(x => x.id === l.id);
+    if (i >= 0) state.fieldLots[i] = l; else state.fieldLots.push(l);
+    nf++;
+  });
+  saveField();
+  for (const l of (data.lotesImportados || [])) {
+    if (!l || !l.id || !Array.isArray(l.points)) continue;
+    const i = state.importedLots.findIndex(x => x.id === l.id);
+    if (i >= 0) state.importedLots[i] = l; else state.importedLots.push(l);
+    try { await idb.put('imported', l); } catch (e) { /* nada */ }
+    ni++;
+  }
+  if (data.borrador && Array.isArray(data.borrador.points) && data.borrador.points.length && !state.draft.points.length) {
+    state.draft = Object.assign(newDraft(), data.borrador); saveDraft();
+  }
+  renderAll(); fitAll();
+  toast(`Respaldo restaurado: ${nf} lote(s) de campo y ${ni} lote(s) importado(s).`, 'success');
+}
+async function clearAll() {
+  const ok = await confirmDialog({
+    title: 'Limpiar toda la base local',
+    message: 'Se borrarán de este dispositivo:\n• todos los lotes de campo\n• todos los lotes importados\n• el lote del colector\n• todas las imágenes de la galería\n\nNo se puede deshacer. Te recomendamos descargar un respaldo antes.',
+    okText: 'Borrar todo', danger: true
+  });
+  if (!ok) return;
+  store.del(LS.field); store.del(LS.draft);
+  try { await idb.clear('imported'); await idb.clear('captures'); } catch (e) { /* nada */ }
+  state.fieldLots = []; state.importedLots = []; state.captures = []; state.draft = newDraft();
+  revokeAllUrls();
+  renderAll();
+  toast('La base local quedó vacía.', 'success');
+}
+async function updateUsage() {
+  const el = $('#usage');
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      const e = await navigator.storage.estimate();
+      el.textContent = `Espacio usado aprox.: ${fmtBytes(e.usage || 0)}`;
+    }
+  } catch (e) { el.textContent = ''; }
+}
+
+/* =====================================================================
+   9. MAPA INTERACTIVO (Leaflet + Esri World Imagery)
+   ===================================================================== */
+function initMap() {
+  if (typeof window.L === 'undefined') { $('#mapFallback').hidden = false; return; }
+  try {
+    const map = L.map('map', { zoomControl: true, attributionControl: true, worldCopyJump: true }).setView([-33.6, -66.0], 7);
+    createImageryLayer().addTo(map);
+    // Límites políticos y localidades: por encima de la imagen y por debajo de los lotes
+    map.createPane('refPane');
+    map.getPane('refPane').style.zIndex = 350;
+    map.getPane('refPane').style.pointerEvents = 'none';
+    state.refLayer = L.tileLayer(REF_URL, { pane: 'refPane', maxZoom: 20, maxNativeZoom: 19, attribution: 'Límites y localidades: Esri, HERE, Garmin, © colaboradores de OpenStreetMap' });
+    if (state.settings.ref) state.refLayer.addTo(map);
+    updateRefButton();
+    map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
+    L.control.scale({ imperial: false, position: 'bottomright' }).addTo(map);
+    state.map = map;
+    state.layers = { lots: L.featureGroup().addTo(map), draft: L.featureGroup().addTo(map), me: L.featureGroup().addTo(map) };
+    $('#mapTools').hidden = false; $('#legend').hidden = false;
+    window.addEventListener('resize', () => map.invalidateSize());
+  } catch (e) {
+    console.error(e); $('#mapFallback').hidden = false;
+  }
+}
+function toggleRefLayer() {
+  if (!state.map || !state.refLayer) return;
+  state.settings.ref = !state.settings.ref;
+  if (state.settings.ref) state.refLayer.addTo(state.map); else state.map.removeLayer(state.refLayer);
+  saveSettings(); updateRefButton();
+}
+function updateRefButton() {
+  const b = $('#btnRef'); if (!b) return;
+  b.classList.toggle('on', !!state.settings.ref);
+  b.setAttribute('aria-pressed', !!state.settings.ref);
+  b.title = state.settings.ref ? 'Ocultar límites y localidades' : 'Mostrar límites y localidades';
+}
+function addPointMarker(layer, p, lotName, color, labels, symbol) {
+  const m = symbol
+    ? L.marker([p.lat, p.lng], { icon: symbolIcon(symbol), keyboard: false })
+    : L.circleMarker([p.lat, p.lng], { radius: 6, color: '#ffffff', weight: 2, fillColor: color, fillOpacity: 1 });
+  if (labels) m.bindTooltip(esc(String(p.n)), { permanent: true, direction: 'right', className: 'pt-label', offset: symbol ? [2, 0] : [6, 0] });
+  else m.bindTooltip(`${esc(lotName)} · punto ${esc(String(p.n))}`, { className: 'lot-tip' });
+  m.addTo(layer);
+}
+function renderMapLots() {
+  if (!state.map) return;
+  const { lots, draft } = state.layers;
+  lots.clearLayers(); draft.clearLayers();
+  const labels = state.settings.el.labels;
+  allLots().forEach(lot => {
+    if (lot.source === 'gps' && lot.id === state.draft.id) return; // se muestra como lote en edición
+    if (lot.polygon) {
+      L.geoJSON(lot.polygon, { style: { color: '#facc15', weight: 2.5, opacity: 1, fillColor: '#facc15', fillOpacity: 0.07 } })
+        .bindTooltip(esc(lot.name), { sticky: true, className: 'lot-tip' })
+        .on('click', () => zoomToLot(lot)).addTo(lots);
+    }
+    lot.points.forEach(p => addPointMarker(lots, p, lot.name, '#10b981', labels, state.settings.symbol));
+  });
+  state.draft.points.forEach(p => addPointMarker(draft, p, state.draft.name || 'Lote en edición', '#22d3ee', labels));
+  const lg = $('#lgSym'); if (lg) lg.innerHTML = symbolSVG(state.settings.symbol, 18);
+}
+function boundsOf(lots) {
+  const fcs = lots.map(lotFC).filter(fc => fc.features.length);
+  if (!fcs.length) return null;
+  const bb = rawBBox({ features: fcs.flatMap(fc => fc.features) });
+  return L.latLngBounds([[bb[1], bb[0]], [bb[3], bb[2]]]);
+}
+function fitLots(lots) {
+  if (!state.map || !lots.length) return;
+  const b = boundsOf(lots);
+  if (!b) return;
+  if (b.getNorthEast().equals(b.getSouthWest())) state.map.setView(b.getCenter(), 17);
+  else state.map.fitBounds(b, { padding: [40, 40], maxZoom: 18 });
+}
+function fitAll() {
+  const lots = allLots();
+  if (state.draft.points.length) lots.push({ polygon: null, points: state.draft.points });
+  fitLots(lots);
+}
+function zoomToLot(lot) {
+  if (!state.map) { toast('El mapa no está disponible sin conexión.', 'warn'); return; }
+  fitLots([lot]);
+  if (window.innerWidth < 900) $('.map-wrap').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function locateMe() {
+  if (!state.map || !navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(pos => {
+    const c = pos.coords, ll = [c.latitude, c.longitude];
+    state.layers.me.clearLayers();
+    L.circle(ll, { radius: c.accuracy, color: '#22d3ee', weight: 1, fillOpacity: 0.12 }).addTo(state.layers.me);
+    L.circleMarker(ll, { radius: 7, color: '#fff', weight: 2.5, fillColor: '#22d3ee', fillOpacity: 1 }).bindTooltip('Estás aquí', { className: 'lot-tip' }).addTo(state.layers.me);
+    state.map.setView(ll, Math.max(state.map.getZoom(), 16));
+  }, () => toast('No se pudo obtener tu ubicación.', 'warn'), { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
+}
+
+/* =====================================================================
+   10. PROCESAMIENTO: COMPOSICIÓN DE LA IMAGEN SATELITAL
+   ===================================================================== */
+/* --- Mosaicos satelitales con respaldo automático ---------------------
+   Esri no tiene imagen de alta resolución en todas las zonas rurales: a
+   ciertos zooms devuelve un mosaico gris con el texto "Map data not yet
+   available". Se detecta ese mosaico (o el error) y se usa el mosaico del
+   nivel de zoom inmediato inferior que sí tenga imagen, ampliado.        */
+let probeCtx = null;
+function isPlaceholderTile(img) {
+  try {
+    if (!probeCtx) { const c = document.createElement('canvas'); c.width = c.height = 32; probeCtx = c.getContext('2d', { willReadFrequently: true }); }
+    if (!probeCtx) return false;
+    probeCtx.clearRect(0, 0, 32, 32);
+    probeCtx.drawImage(img, 0, 0, 32, 32);
+    return looksLikePlaceholder(probeCtx.getImageData(0, 0, 32, 32).data);
+  } catch (e) { return false; }
+}
+function looksLikePlaceholder(d) {
+  let neutral = 0, sum = 0, sum2 = 0;
+  const n = d.length / 4;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    if (Math.max(r, g, b) - Math.min(r, g, b) <= 8) neutral++;
+    const l = (r + g + b) / 3; sum += l; sum2 += l * l;
+  }
+  const mean = sum / n, sd = Math.sqrt(Math.max(0, sum2 / n - mean * mean));
+  // mosaico "sin datos": casi todo gris neutro, claro y parejo
+  return neutral / n > 0.97 && mean > 150 && mean < 250 && sd < 32;
+}
+const tileCache = new Map();
+function fetchTile(z, x, y) {
+  const key = z + '/' + x + '/' + y;
+  if (tileCache.has(key)) return tileCache.get(key);
+  if (tileCache.size > 1500) tileCache.clear();
+  const once = () => new Promise(resolve => {
+    const img = new Image();
+    let settled = false;
+    const done = v => { if (settled) return; settled = true; clearTimeout(t); resolve(v); };
+    const t = setTimeout(() => done({ img: null, missing: false }), 20000);
+    img.crossOrigin = 'anonymous';
+    img.onload = () => done(isPlaceholderTile(img) ? { img: null, missing: true } : { img, missing: false });
+    img.onerror = () => done({ img: null, missing: true }); // blankTile=false devuelve error si no hay imagen
+    img.src = ESRI_URL.replace('{z}', z).replace('{y}', y).replace('{x}', x);
+  });
+  const p = once().then(r => (r.img || r.missing) ? r : sleep(400).then(once)).then(r => r.img);
+  tileCache.set(key, p);
+  p.then(img => { if (!img) setTimeout(() => tileCache.delete(key), 60000); });
+  return p;
+}
+/* Devuelve el mosaico pedido o el de un nivel superior (recortado) si no hay imagen */
+async function resolveTile(z, x, y, maxUp = MAX_FALLBACK) {
+  const d0 = Math.max(0, z - MAX_NATIVE_Z);
+  for (let d = d0; d <= maxUp + d0 && z - d >= 0; d++) {
+    const f = Math.pow(2, d), px = Math.floor(x / f), py = Math.floor(y / f);
+    const img = await fetchTile(z - d, px, py);
+    if (img) { const sw = 256 / f; return { img, d, sx: (x - px * f) * sw, sy: (y - py * f) * sw, sw }; }
+  }
+  return null;
+}
+/* Capa del visor con el mismo respaldo automático */
+function createImageryLayer() {
+  const Layer = L.GridLayer.extend({
+    createTile(coords, done) {
+      const tile = document.createElement('canvas');
+      const ratio = Math.min(2, window.devicePixelRatio || 1);
+      tile.width = tile.height = 256 * ratio;
+      const n = Math.pow(2, coords.z), x = ((coords.x % n) + n) % n;
+      if (coords.y < 0 || coords.y >= n) { setTimeout(() => done(null, tile), 0); return tile; }
+      resolveTile(coords.z, x, coords.y).then(r => {
+        const g = tile.getContext('2d');
+        if (r && g) { g.imageSmoothingEnabled = true; g.drawImage(r.img, r.sx, r.sy, r.sw, r.sw, 0, 0, tile.width, tile.height); }
+        done(null, tile);
+      }).catch(err => done(err, tile));
+      return tile;
+    }
+  });
+  return new Layer({ maxZoom: 20, attribution: 'Imágenes © Esri, Maxar, Earthstar Geographics' });
+}
+async function runPool(items, n, fn) {
+  let i = 0;
+  const workers = Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (i < items.length && !state.cancel) { const it = items[i++]; await fn(it); }
+  });
+  await Promise.all(workers);
+}
+function rr(g, x, y, w, h, r) {
+  r = Math.max(0, Math.min(r, w / 2, h / 2));
+  g.beginPath(); g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r);
+  g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h); g.lineTo(x + r, y + h);
+  g.quadraticCurveTo(x, y + h, x, y + h - r); g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y); g.closePath();
+}
+async function fontsReady() {
+  if (!document.fonts || !document.fonts.load) return;
+  try { await Promise.race([Promise.all([document.fonts.load('800 40px Inter'), document.fonts.load('600 20px Inter'), document.fonts.load('500 20px "JetBrains Mono"')]), sleep(2500)]); } catch (e) { /* tipografía alternativa */ }
+}
+async function renderLotImage(lot, bb, fmt, onTile) {
+  const W = fmt.w, H = fmt.h;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#0b1220'; g.fillRect(0, 0, W, H);
+  g.imageSmoothingEnabled = true; if ('imageSmoothingQuality' in g) g.imageSmoothingQuality = 'high';
+  let v = planView(bb, W, H);
+  // Sondeo: si en el centro del lote no hay imagen a este zoom, se baja el zoom de toda la captura
+  const probes = [v.tiles[Math.floor(v.tiles.length / 2)], v.tiles[0], v.tiles[v.tiles.length - 1]].filter(Boolean);
+  let drop = 0;
+  for (const t of probes) { const r = await resolveTile(v.zt, t.x, t.ty); if (r) drop = Math.max(drop, r.d); }
+  if (drop > 0) v = planView(bb, W, H, v.zt - drop);
+  let done = 0, failed = 0, upscaled = 0;
+  await runPool(v.tiles, TILE_CONCURRENCY, async t => {
+    const r = await resolveTile(v.zt, t.x, t.ty);
+    const s = 256 * v.k, dx = Math.floor((t.tx * 256 - v.otx) * v.k), dy = Math.floor((t.ty * 256 - v.oty) * v.k), ds = Math.ceil(s) + 1;
+    if (r) { g.drawImage(r.img, r.sx, r.sy, r.sw, r.sw, dx, dy, ds, ds); if (r.d) upscaled++; }
+    else { failed++; g.fillStyle = '#1e293b'; g.fillRect(dx, dy, ds, ds); }
+    done++; if (onTile) onTile(done, v.tiles.length);
+  });
+  if (state.cancel) throw new Error('Cancelado por el usuario');
+  if (failed === v.tiles.length) throw new Error('No se pudo descargar la imagen satelital (revisa la conexión).');
+  drawOverlays(g, lot, { W, H, z: v.z, toPx: v.toPx, bb });
+  const blob = await new Promise(res => { try { canvas.toBlob(b => res(b), 'image/jpeg', 0.92); } catch (e) { res(null); } });
+  if (!blob) throw new Error('El navegador no pudo generar el JPG.');
+  canvas.width = canvas.height = 1; // liberar memoria (importante en iPhone)
+  return { blob, failed, zoom: v.zt, lowered: drop > 0 || upscaled > 0 };
+}
+/* --- Símbolos de los puntos (imagen final) --- */
+const SYMBOL_LABEL_OFFSET = { circle: [15, -15], pin: [16, -34], target: [21, -19], triangle: [16, -15] };
+function drawSymbol(g, id, x, y, s) {
+  g.save();
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  if (id === 'pin') {
+    const cy = y - 26 * s, R = 12 * s;
+    const path = () => { g.beginPath(); g.moveTo(x, y); g.arc(x, cy, R, Math.PI * 0.8, Math.PI * 0.2, false); g.closePath(); };
+    path(); g.lineWidth = 7 * s; g.strokeStyle = 'rgba(0,0,0,0.5)'; g.stroke();
+    path(); g.fillStyle = '#ef4444'; g.fill(); g.lineWidth = 2.5 * s; g.strokeStyle = '#ffffff'; g.stroke();
+    g.beginPath(); g.arc(x, cy, 4.5 * s, 0, Math.PI * 2); g.fillStyle = '#ffffff'; g.fill();
+  } else if (id === 'target') {
+    const ring = () => { g.beginPath(); g.arc(x, y, 13 * s, 0, Math.PI * 2); };
+    const cross = () => { g.beginPath(); [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(([dx, dy]) => { g.moveTo(x + dx * 7 * s, y + dy * 7 * s); g.lineTo(x + dx * 21 * s, y + dy * 21 * s); }); };
+    ring(); g.lineWidth = 7 * s; g.strokeStyle = 'rgba(0,0,0,0.55)'; g.stroke();
+    cross(); g.lineWidth = 6.5 * s; g.stroke();
+    ring(); g.lineWidth = 3 * s; g.strokeStyle = '#ffffff'; g.stroke();
+    cross(); g.lineWidth = 2.6 * s; g.stroke();
+    g.beginPath(); g.arc(x, y, 4 * s, 0, Math.PI * 2); g.fillStyle = '#ef4444'; g.fill(); g.lineWidth = 1.6 * s; g.strokeStyle = '#ffffff'; g.stroke();
+  } else if (id === 'triangle') {
+    const path = () => { g.beginPath(); g.moveTo(x, y - 15 * s); g.lineTo(x + 13.5 * s, y + 9 * s); g.lineTo(x - 13.5 * s, y + 9 * s); g.closePath(); };
+    path(); g.lineWidth = 8 * s; g.strokeStyle = 'rgba(0,0,0,0.5)'; g.stroke();
+    path(); g.fillStyle = '#f97316'; g.fill(); g.lineWidth = 3 * s; g.strokeStyle = '#ffffff'; g.stroke();
+  } else {
+    g.beginPath(); g.arc(x, y, 13 * s, 0, Math.PI * 2); g.fillStyle = 'rgba(0,0,0,0.45)'; g.fill();
+    g.beginPath(); g.arc(x, y, 10 * s, 0, Math.PI * 2); g.fillStyle = '#10b981'; g.fill();
+    g.lineWidth = 3 * s; g.strokeStyle = '#ffffff'; g.stroke();
+  }
+  g.restore();
+}
+/* --- Símbolos de los puntos (visor, configuración y leyenda) --- */
+function symbolSVG(id, size = 30) {
+  const body = {
+    circle: '<circle cx="20" cy="20" r="11" fill="rgba(0,0,0,.35)"/><circle cx="20" cy="20" r="8" fill="#10b981" stroke="#fff" stroke-width="2.5"/>',
+    pin: '<path d="M20 37 L11.9 20.9 A10 10 0 1 1 28.1 20.9 Z" fill="none" stroke="rgba(0,0,0,.45)" stroke-width="5" stroke-linejoin="round"/><path d="M20 37 L11.9 20.9 A10 10 0 1 1 28.1 20.9 Z" fill="#ef4444" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><circle cx="20" cy="15" r="3.8" fill="#fff"/>',
+    target: '<g fill="none" stroke-linecap="round"><circle cx="20" cy="20" r="11" stroke="rgba(0,0,0,.55)" stroke-width="5.5"/><path d="M20 3v8M20 29v8M3 20h8M29 20h8" stroke="rgba(0,0,0,.55)" stroke-width="5"/><circle cx="20" cy="20" r="11" stroke="#fff" stroke-width="2.5"/><path d="M20 3v8M20 29v8M3 20h8M29 20h8" stroke="#fff" stroke-width="2.2"/></g><circle cx="20" cy="20" r="3.2" fill="#ef4444" stroke="#fff" stroke-width="1.3"/>',
+    triangle: '<path d="M20 7 L32 28 L8 28 Z" fill="#f97316" stroke="rgba(0,0,0,.45)" stroke-width="5" stroke-linejoin="round"/><path d="M20 7 L32 28 L8 28 Z" fill="#f97316" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/>'
+  }[id] || '';
+  return `<svg viewBox="0 0 40 40" width="${size}" height="${size}" aria-hidden="true" style="overflow:visible">${body}</svg>`;
+}
+function symbolIcon(id) {
+  const size = Math.round(26 * (state.settings.symSize || 100) / 100);
+  const pin = id === 'pin';
+  return L.divIcon({
+    className: 'sym-icon', html: symbolSVG(id, size), iconSize: [size, size],
+    iconAnchor: pin ? [size / 2, size * 37 / 40] : [size / 2, size / 2],
+    tooltipAnchor: pin ? [6, -size * 0.55] : [size * 0.3, 0]
+  });
+}
+function drawOverlays(g, lot, o) {
+  const el = state.settings.el, s = o.W / 1920, W = o.W, H = o.H;
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  // Contorno del polígono
+  if (el.outline && lot.polygon) {
+    const polys = lot.polygon.type === 'Polygon' ? [lot.polygon.coordinates] : lot.polygon.coordinates;
+    const path = () => { g.beginPath(); polys.forEach(rings => rings.forEach(r => { r.forEach((c, i) => { const [x, y] = o.toPx(c[0], c[1]); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath(); })); };
+    path(); g.fillStyle = 'rgba(250,204,21,0.06)'; g.fill('evenodd');
+    path(); g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 10 * s; g.stroke();
+    path(); g.strokeStyle = '#facc15'; g.lineWidth = 4.5 * s; g.stroke();
+  }
+  // Puntos de muestreo (símbolo elegido en la configuración)
+  const sym = state.settings.symbol;
+  const k = (state.settings.symSize || 100) / 100; // tamaño elegido del símbolo
+  if (el.points) lot.points.forEach(p => { const [x, y] = o.toPx(p.lng, p.lat); drawSymbol(g, sym, x, y, s * k); });
+  // Números de los puntos (con contorno oscuro para leer sobre cualquier fondo)
+  if (el.labels) {
+    g.font = `800 ${Math.round(28 * s * Math.sqrt(k))}px Inter, system-ui, sans-serif`;
+    g.textBaseline = 'middle'; g.textAlign = el.points ? 'left' : 'center';
+    const off = SYMBOL_LABEL_OFFSET[sym] || [15, -15];
+    lot.points.forEach(p => {
+      const [x, y] = o.toPx(p.lng, p.lat);
+      const tx = el.points ? x + off[0] * s * k : x, ty = el.points ? y + off[1] * s * k : y;
+      const t = String(p.n);
+      g.lineWidth = 8 * s; g.strokeStyle = 'rgba(0,0,0,0.88)'; g.strokeText(t, tx, ty);
+      g.fillStyle = '#ffffff'; g.fillText(t, tx, ty);
+    });
+  }
+  const M = 28 * s;
+  // Caja de información: nombre, fecha, centro
+  const lines = [];
+  if (el.name) lines.push({ t: lot.name, f: `800 ${Math.round(44 * s)}px Inter, system-ui, sans-serif`, c: '#ffffff', h: 56 * s });
+  if (el.date) lines.push({ t: 'Fecha: ' + fmtDate(new Date()), f: `600 ${Math.round(22 * s)}px Inter, system-ui, sans-serif`, c: '#cbd5e1', h: 32 * s });
+  if (el.center) { const c = lotCenter(lot); lines.push({ t: `Centro: ${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`, f: `500 ${Math.round(22 * s)}px "JetBrains Mono", ui-monospace, monospace`, c: '#a7f3d0', h: 32 * s }); }
+  if (lines.length) {
+    const maxW = W * 0.62, padX = 24 * s, padY = 18 * s;
+    let bw = 0;
+    lines.forEach(L0 => {
+      g.font = L0.f;
+      let t = L0.t;
+      if (g.measureText(t).width > maxW) { while (t.length > 3 && g.measureText(t + '…').width > maxW) t = t.slice(0, -1); t += '…'; }
+      L0.t = t; bw = Math.max(bw, g.measureText(t).width);
+    });
+    const bh = lines.reduce((a, L0) => a + L0.h, 0) + padY * 2;
+    rr(g, M, M, bw + padX * 2 + 6 * s, bh, 16 * s);
+    g.fillStyle = 'rgba(15,23,42,0.82)'; g.fill();
+    g.lineWidth = 1.5 * s; g.strokeStyle = 'rgba(255,255,255,0.14)'; g.stroke();
+    g.fillStyle = '#10b981'; rr(g, M, M, 6 * s, bh, 3 * s); g.fill();
+    let y = M + padY;
+    g.textAlign = 'left'; g.textBaseline = 'middle';
+    lines.forEach(L0 => { g.font = L0.f; g.fillStyle = L0.c; g.fillText(L0.t, M + padX + 6 * s, y + L0.h / 2); y += L0.h; });
+  }
+  // Flecha de norte
+  if (el.north) {
+    const r = 48 * s, cx = W - M - r, cy = M + r;
+    g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fillStyle = 'rgba(15,23,42,0.82)'; g.fill();
+    g.lineWidth = 1.5 * s; g.strokeStyle = 'rgba(255,255,255,0.18)'; g.stroke();
+    const top = cy - r * 0.2, bot = cy + r * 0.72, mid = cy + r * 0.42, hw = r * 0.34;
+    g.beginPath(); g.moveTo(cx, top); g.lineTo(cx + hw, bot); g.lineTo(cx, mid); g.closePath(); g.fillStyle = '#94a3b8'; g.fill();
+    g.beginPath(); g.moveTo(cx, top); g.lineTo(cx - hw, bot); g.lineTo(cx, mid); g.closePath(); g.fillStyle = '#ffffff'; g.fill();
+    g.font = `800 ${Math.round(26 * s)}px Inter, system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#facc15'; g.fillText('N', cx, cy - r * 0.52);
+  }
+  // Escala gráfica
+  if (el.scale) {
+    const lat = (o.bb[1] + o.bb[3]) / 2;
+    const mpp = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, o.z);
+    const target = W * 0.2 * mpp;
+    const nice = [10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000, 20000, 50000];
+    let len = nice[0]; nice.forEach(v => { if (v <= target) len = v; });
+    const px = len / mpp, bh = 12 * s, x0 = M + 22 * s, yb = H - M - 26 * s;
+    const boxW = px + 44 * s + 40 * s, boxH = 74 * s;
+    rr(g, M, H - M - boxH, boxW, boxH, 14 * s); g.fillStyle = 'rgba(15,23,42,0.82)'; g.fill();
+    g.lineWidth = 1.5 * s; g.strokeStyle = 'rgba(255,255,255,0.14)'; g.stroke();
+    for (let i = 0; i < 4; i++) { g.fillStyle = i % 2 ? '#0f172a' : '#ffffff'; g.fillRect(x0 + px * i / 4, yb - bh, px / 4, bh); }
+    g.lineWidth = 1.5 * s; g.strokeStyle = '#ffffff'; g.strokeRect(x0, yb - bh, px, bh);
+    g.font = `600 ${Math.round(18 * s)}px Inter, system-ui, sans-serif`; g.fillStyle = '#ffffff'; g.textBaseline = 'alphabetic';
+    g.textAlign = 'left'; g.fillText('0', x0 - 4 * s, yb - bh - 9 * s);
+    g.textAlign = 'center'; g.fillText(fmtDist(len), x0 + px, yb - bh - 9 * s);
+  }
+  // Atribución (siempre visible)
+  g.font = `500 ${Math.round(15 * s)}px Inter, system-ui, sans-serif`;
+  const aw = g.measureText(ESRI_ATTR).width + 20 * s, ah = 28 * s;
+  g.fillStyle = 'rgba(0,0,0,0.6)'; rr(g, W - aw - 10 * s, H - ah - 10 * s, aw, ah, 7 * s); g.fill();
+  g.fillStyle = '#e2e8f0'; g.textAlign = 'right'; g.textBaseline = 'middle';
+  g.fillText(ESRI_ATTR, W - 20 * s, H - 10 * s - ah / 2);
+}
+function setProgress(i, total, title, detail) {
+  $('#pcTitle').textContent = title;
+  $('#pcDetail').textContent = detail || '';
+  $('#pcBar').style.width = Math.round(Math.min(1, Math.max(0, i / total)) * 100) + '%';
+}
+async function processAll() {
+  if (state.processing) return;
+  const lots = allLots().filter(l => l.polygon || l.points.length);
+  if (!lots.length) { toast('No hay lotes para procesar. Importa un GeoJSON o guarda un lote de campo.', 'warn'); return; }
+  if (!navigator.onLine) { toast('Sin conexión: el procesamiento necesita internet para descargar la imagen satelital. Hazlo cuando tengas señal o desde la PC.', 'error'); return; }
+  if (state.draft.dirty && state.draft.points.length) toast('Atención: el lote del colector tiene cambios sin guardar y no se procesará.', 'warn', 7000);
+  state.processing = true; state.cancel = false;
+  $('#btnProcess').disabled = true; $('#progress').hidden = false;
+  setProgress(0, lots.length, 'Preparando…', 'Cargando tipografías');
+  await fontsReady();
+  const fmt = FORMATS[state.settings.format];
+  const errors = [];
+  let ok = 0, partial = 0, lowered = 0;
+  for (let i = 0; i < lots.length; i++) {
+    if (state.cancel) break;
+    const lot = lots[i];
+    setProgress(i, lots.length, `Lote ${i + 1} de ${lots.length}: ${lot.name}`, 'Calculando encuadre con buffer…');
+    try {
+      const bb = computeExtent(lot, state.settings.buffer);
+      if (state.map) { try { state.map.fitBounds([[bb[1], bb[0]], [bb[3], bb[2]]], { animate: false }); } catch (e) { /* visual */ } }
+      const res = await renderLotImage(lot, bb, fmt, (d, t) => setProgress(i + d / t, lots.length, `Lote ${i + 1} de ${lots.length}: ${lot.name}`, `Imagen satelital: ${d}/${t} mosaicos`));
+      const cap = { id: lot.id, name: lot.name, source: lot.source, blob: res.blob, w: fmt.w, h: fmt.h, format: state.settings.format, buffer: state.settings.buffer, zoom: res.zoom, createdAt: Date.now() };
+      try { await idb.put('captures', cap); } catch (e) { console.warn('La imagen no se pudo guardar en IndexedDB', e); }
+      revokeUrlsFor(cap.id);
+      const idx = state.captures.findIndex(c => c.id === cap.id);
+      if (idx >= 0) state.captures[idx] = cap; else state.captures.push(cap);
+      ok++; if (res.failed) partial++; if (res.lowered) lowered++;
+    } catch (e) {
+      if (state.cancel) break;
+      console.error(e); errors.push(`${lot.name}: ${e.message}`);
+    }
+    await sleep(30);
+  }
+  const cancelled = state.cancel;
+  state.processing = false; state.cancel = false;
+  $('#btnProcess').disabled = false; $('#progress').hidden = true;
+  renderGallery(); renderImported(); renderFieldLots(); updateUsage();
+  if (ok) {
+    toast(`${cancelled ? 'Proceso cancelado. ' : ''}${ok} imagen(es) generada(s)${partial ? ` (${partial} con zonas sin imagen satelital)` : ''}.${lowered ? ` En ${lowered} lote(s) Esri no tiene imagen de máximo detalle: se usó el mejor nivel disponible.` : ''}`, 'success', 8000);
+    switchTab('galeria');
+  } else if (cancelled) toast('Proceso cancelado.', 'warn');
+  if (errors.length) toast('No se pudieron procesar: ' + errors.join(' | '), 'error', 12000);
+}
+
+/* =====================================================================
+   11. GALERÍA, ZIP Y VISOR AMPLIADO
+   ===================================================================== */
+const urlCache = new Map();
+function capUrl(c) {
+  const key = c.id + ':' + c.createdAt;
+  if (!urlCache.has(key)) urlCache.set(key, URL.createObjectURL(c.blob));
+  return urlCache.get(key);
+}
+function revokeUrlsFor(id) { for (const [k, u] of urlCache) if (k.startsWith(id + ':')) { URL.revokeObjectURL(u); urlCache.delete(k); } }
+function revokeAllUrls() { for (const u of urlCache.values()) URL.revokeObjectURL(u); urlCache.clear(); }
+function capFileName(c) { return `${slug(c.name)}.jpg`; }
+function renderGallery() {
+  const grid = $('#galleryGrid');
+  const caps = state.captures.slice().sort(sortByName);
+  $('#capCount').textContent = caps.length;
+  $('#btnZip').disabled = !caps.length;
+  $('#btnClearGallery').disabled = !caps.length;
+  $('#galInfo').textContent = caps.length ? `${caps.length} imagen(es) lista(s) para descargar.` : 'Todavía no hay imágenes procesadas.';
+  if (!caps.length) {
+    grid.innerHTML = `<div class="gal-empty" style="grid-column:1/-1">${icon('image')}<strong>La galería está vacía</strong><span>Ve a "Visor y Procesamiento GIS" y presiona "Procesar Todos los Lotes y Generar Capturas".</span><button class="btn btn-outline" type="button" data-goto="visor">${icon('map')}Ir al visor</button></div>`;
+    return;
+  }
+  grid.innerHTML = caps.map(c => `
+    <article class="cap-card">
+      <button class="cap-thumb" type="button" data-act="view" data-id="${esc(c.id)}" style="aspect-ratio:${c.w}/${c.h}" aria-label="Ver ${esc(c.name)} ampliada">
+        <img src="${capUrl(c)}" alt="Captura satelital de ${esc(c.name)}" loading="lazy">
+        <span class="badge">${esc(c.format)}</span><span class="zoom">${icon('zoom')}</span>
+      </button>
+      <div class="cap-body">
+        <div><h3 title="${esc(c.name)}">${esc(c.name)}</h3>
+        <div class="meta">${c.w}×${c.h} · buffer ${c.buffer || '—'} m${c.zoom ? ' · zoom ' + c.zoom : ''} · ${fmtDateTime(new Date(c.createdAt))}</div></div>
+        <div class="row">
+          <button class="btn btn-primary btn-sm grow" type="button" data-act="jpg" data-id="${esc(c.id)}">${icon('download')}Descargar JPG</button>
+          <button class="icon-btn danger" type="button" data-act="del-cap" data-id="${esc(c.id)}" title="Borrar imagen" aria-label="Borrar imagen">${icon('trash')}</button>
+        </div>
+      </div>
+    </article>`).join('');
+}
+function downloadCap(id) { const c = state.captures.find(x => x.id === id); if (c) downloadBlob(c.blob, capFileName(c)); }
+async function deleteCap(id) {
+  const c = state.captures.find(x => x.id === id);
+  if (!c) return;
+  const ok = await confirmDialog({ title: 'Borrar imagen', message: `¿Borrar la imagen de «${c.name}»? El lote no se borra y puedes volver a procesarlo.`, okText: 'Borrar', danger: true });
+  if (!ok) return;
+  state.captures = state.captures.filter(x => x.id !== id);
+  revokeUrlsFor(id);
+  try { await idb.del('captures', id); } catch (e) { /* nada */ }
+  renderGallery(); renderImported(); renderFieldLots(); updateUsage();
+}
+async function clearGallery() {
+  const ok = await confirmDialog({ title: 'Borrar todas las imágenes', message: '¿Borrar todas las imágenes de la galería? Los lotes no se borran.', okText: 'Borrar imágenes', danger: true });
+  if (!ok) return;
+  state.captures = []; revokeAllUrls();
+  try { await idb.clear('captures'); } catch (e) { /* nada */ }
+  renderGallery(); renderImported(); renderFieldLots(); updateUsage();
+}
+async function downloadZip() {
+  if (!state.captures.length) return;
+  if (typeof window.JSZip === 'undefined') { toast('La librería ZIP no está disponible. Conéctate a internet y recarga la página.', 'error'); return; }
+  const btn = $('#btnZip'); btn.disabled = true;
+  try {
+    const zip = new JSZip(), used = new Set();
+    state.captures.slice().sort(sortByName).forEach(c => {
+      const base = slug(c.name); let f = base + '.jpg', i = 2;
+      while (used.has(f.toLowerCase())) f = `${base}_${i++}.jpg`;
+      used.add(f.toLowerCase()); zip.file(f, c.blob);
+    });
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+    downloadBlob(blob, `capturas_muestreo_${stamp()}.zip`);
+    toast('ZIP descargado.', 'success');
+  } catch (e) { toast('No se pudo crear el ZIP: ' + e.message, 'error'); }
+  finally { btn.disabled = !state.captures.length; }
+}
+function openLightbox(id) {
+  const c = state.captures.find(x => x.id === id);
+  if (!c) return;
+  $('#lbTitle').textContent = c.name;
+  $('#lbImg').src = capUrl(c);
+  $('#lbImg').alt = 'Captura satelital de ' + c.name;
+  $('#lbDownload').onclick = () => downloadCap(id);
+  openModal('#lightbox');
+}
+
+/* =====================================================================
+   12. RENDERIZADO DE PANELES
+   ===================================================================== */
+const hasCap = id => state.captures.some(c => c.id === id);
+function renderImported() {
+  const list = $('#importedList');
+  const lots = state.importedLots.slice().sort(sortByName);
+  $('#impCount').textContent = lots.length;
+  if (!lots.length) { list.innerHTML = ''; return; }
+  list.innerHTML = lots.map(l => {
+    const meta = l.polygon ? (l.points.length ? `Polígono + ${l.points.length} pts` : 'Solo polígono') : `${l.points.length} pts (sin polígono)`;
+    return `<li class="lot-item">
+      <button class="lot-main" type="button" data-act="zoom-imp" data-id="${esc(l.id)}" title="Ver en el mapa"><span class="lot-name">${hasCap(l.id) ? icon('image') : ''}${esc(l.name)}</span><span class="lot-meta">${meta}</span></button>
+      <button class="icon-btn" type="button" data-act="geo-imp" data-id="${esc(l.id)}" title="Descargar GeoJSON" aria-label="Descargar GeoJSON">${icon('download')}</button>
+      <button class="icon-btn danger" type="button" data-act="del-imp" data-id="${esc(l.id)}" title="Quitar" aria-label="Quitar lote">${icon('trash')}</button>
+    </li>`;
+  }).join('');
+}
+function renderFieldLots() {
+  const list = $('#fieldList');
+  const lots = state.fieldLots.slice().sort(sortByName);
+  $('#fieldCount').textContent = lots.length;
+  $('#fieldExport').hidden = !lots.length;
+  if (!lots.length) { list.innerHTML = '<li class="empty">Aún no hay lotes guardados en este dispositivo.</li>'; return; }
+  list.innerHTML = lots.map(l => `<li class="lot-item${l.id === state.draft.id ? ' editing' : ''}">
+      <button class="lot-main" type="button" data-act="zoom-field" data-id="${esc(l.id)}" title="Ver en el mapa"><span class="lot-name">${hasCap(l.id) ? icon('image') : ''}${esc(l.name)}</span><span class="lot-meta">${l.points.length} pts · ${fmtDate(new Date(l.updatedAt || l.createdAt))}${l.id === state.draft.id ? ' · en edición' : ''}</span></button>
+      <button class="icon-btn" type="button" data-act="edit-field" data-id="${esc(l.id)}" title="Editar" aria-label="Editar lote">${icon('pencil')}</button>
+      <button class="icon-btn" type="button" data-act="geo-field" data-id="${esc(l.id)}" title="Descargar GeoJSON" aria-label="Descargar GeoJSON">${icon('download')}</button>
+      <button class="icon-btn danger" type="button" data-act="del-field" data-id="${esc(l.id)}" title="Eliminar" aria-label="Eliminar lote">${icon('trash')}</button>
+    </li>`).join('');
+}
+function renderDraft() {
+  const d = state.draft, inp = $('#lotName');
+  if (document.activeElement !== inp && inp.value !== d.name) inp.value = d.name;
+  $('#draftCount').textContent = d.points.length;
+  $('#editingNote').hidden = !d.id;
+  const list = $('#draftPoints');
+  if (!d.points.length) { list.innerHTML = '<li class="pt-empty">Sin puntos. Toca "Capturar Punto GPS Actual" en cada sitio de muestreo.</li>'; return; }
+  list.innerHTML = d.points.map(p => {
+    const bad = p.acc != null && p.acc > ACC_WARN;
+    return `<li><span class="pt-n">${esc(p.n)}</span><span class="pt-c">${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}</span>` +
+      `<span class="pt-a${bad ? ' bad' : ''}" title="${bad ? 'Precisión baja' : 'Precisión'}">${p.acc != null ? '±' + Math.round(p.acc) + ' m' : ''}${bad ? ' ⚠' : ''}</span>` +
+      `<button class="icon-btn danger" type="button" data-act="del-pt" data-n="${esc(p.n)}" title="Borrar punto" aria-label="Borrar punto ${esc(p.n)}">${icon('trash')}</button></li>`;
+  }).join('');
+}
+function updateProcessInfo() {
+  const lots = allLots().filter(l => l.polygon || l.points.length);
+  const imp = lots.filter(l => l.source === 'geojson').length, gps = lots.length - imp;
+  $('#processInfo').textContent = lots.length
+    ? `${lots.length} lote(s) listo(s): ${imp} importado(s) y ${gps} de campo · ${FORMATS[state.settings.format].w}×${FORMATS[state.settings.format].h} · buffer ${state.settings.buffer} m`
+    : 'No hay lotes cargados.';
+}
+function renderAll() {
+  renderDraft(); renderFieldLots(); renderImported(); renderMapLots(); renderGallery(); updateProcessInfo(); updateUsage();
+}
+function updateSymSizeUI() {
+  const v = state.settings.symSize || 100;
+  $('#symSizeVal').textContent = v + ' %';
+  $('#symSizePrev').innerHTML = symbolSVG(state.settings.symbol, Math.round(20 * v / 100)); // vista previa proporcional
+}
+function applySettingsUI() {
+  const s = state.settings;
+  $('#bufRange').value = s.buffer;
+  $('#bufVal').textContent = s.buffer + ' m';
+  $$('#fmtSeg button').forEach(b => b.classList.toggle('on', b.dataset.fmt === s.format));
+  $('#symSizeRange').value = s.symSize;
+  updateSymSizeUI();
+  $('#symSeg').innerHTML = SYMBOLS.map(x => `<button type="button" data-sym="${x.id}" class="${x.id === s.symbol ? 'on' : ''}" aria-pressed="${x.id === s.symbol}" title="${x.label}"><span class="sym-prev">${symbolSVG(x.id, 30)}</span><span>${x.label}</span></button>`).join('');
+  $('#elChecks').innerHTML = EL_LABELS.map(([k, l]) => `<label class="chk"><input type="checkbox" data-el="${k}" ${s.el[k] ? 'checked' : ''}><span>${l}</span></label>`).join('') +
+    '<label class="chk locked"><input type="checkbox" checked disabled><span>Atribución de la imagen satelital <em>(obligatoria)</em></span></label>';
+}
+
+/* =====================================================================
+   13. NAVEGACIÓN, CONEXIÓN Y MODALES
+   ===================================================================== */
+function switchTab(name) {
+  $$('.tab').forEach(t => { const on = t.dataset.tab === name; t.classList.toggle('active', on); t.setAttribute('aria-selected', on); });
+  $$('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+  if (name === 'visor' && state.map) setTimeout(() => state.map.invalidateSize(), 50);
+  if (window.innerWidth < 900) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function updateConn() {
+  const on = navigator.onLine;
+  $('#offlineBanner').hidden = on;
+  const b = $('#connBadge');
+  b.textContent = on ? 'En línea' : 'Sin conexión';
+  b.classList.toggle('off', !on);
+  if (state.map) setTimeout(() => state.map.invalidateSize(), 60);
+}
+function openModal(sel) { $(sel).classList.add('open'); }
+function closeModal(el) { el.classList.remove('open'); }
+
+/* =====================================================================
+   14. GUÍA DE USUARIO (contenido único para la ayuda y el PDF)
+   ===================================================================== */
+const GUIDE = [
+  { t: '¿Para qué sirve AgroField Capture?',
+    intro: 'Reúne en un solo lugar los lotes y los puntos de muestreo de suelo, ya sea cargándolos desde QGIS o tomándolos con el GPS del celular en el campo, y genera imágenes satelitales listas para informes.',
+    steps: ['En la pestaña "Visor y Procesamiento GIS" se cargan, colectan y procesan los lotes.', 'En la pestaña "Galería de Capturas y Exportación" se ven y descargan las imágenes JPG.', 'Todo queda guardado en el dispositivo, aunque cierres la página.'],
+    tip: 'El colector GPS funciona sin señal. El mapa satelital y la generación de imágenes necesitan internet. Cuando no hay conexión aparece el cartel naranja "Sin conexión".', fig: 'flujo' },
+  { t: 'Instalar la app en el iPhone (una sola vez)',
+    intro: 'Para usarla en el campo sin señal, primero hay que instalarla en la pantalla de inicio estando con conexión.',
+    steps: ['Abre la dirección web de la app en Safari, con datos móviles o Wi-Fi.', 'Toca el botón Compartir (el cuadrado con la flecha hacia arriba).', 'Elige "Agregar a pantalla de inicio" y confirma con "Agregar".', 'Abre la app desde el nuevo ícono con conexión y espera unos segundos: a partir de ahí también abre sin señal.', 'Cuando el teléfono lo pregunte, permite el acceso a la ubicación.'],
+    tip: 'Usa siempre el ícono de la pantalla de inicio. Los datos guardados desde el ícono y desde Safari son independientes entre sí.', fig: 'iphone' },
+  { t: 'Exportar GeoJSON desde QGIS (EPSG:4326)',
+    intro: 'La app lee archivos GeoJSON en coordenadas geográficas WGS 84 (EPSG:4326). Se pueden exportar polígonos, puntos o ambos.',
+    steps: ['En el panel Capas, haz clic derecho sobre la capa y elige Exportar > Guardar objetos como...', 'En "Formato" elige GeoJSON.', 'En "Nombre de archivo" elige la carpeta y escribe el nombre (por ejemplo, lotes_campo.geojson).', 'En "SRC" selecciona EPSG:4326 - WGS 84. Este paso es obligatorio.', 'Presiona Aceptar. Repite con la capa de puntos si la tienes por separado.'],
+    tip: 'La capa de polígonos debe tener un campo llamado "lote" con el nombre de cada lote. Para que los puntos muestren su número, usa un campo "punto" (también sirven "numero", "nro" o "id"). Si no hay número, la app los numera según el orden del archivo.', fig: 'qgis' },
+  { t: 'Cargar los archivos en la app',
+    intro: 'Se pueden cargar varios archivos a la vez: solo polígonos, solo puntos o ambos.',
+    steps: ['En la pestaña "Visor y Procesamiento GIS", abre la sección "Importar desde QGIS".', 'Toca "Seleccionar archivos .geojson" o arrastra los archivos sobre el recuadro.', 'Los polígonos aparecen en amarillo y los puntos con el símbolo elegido sobre el mapa satelital.', 'Cada punto se asigna automáticamente al lote cuyo polígono lo contiene.', 'Toca el nombre de un lote en la lista para acercar el mapa a ese lote.'],
+    tip: 'Si cargas de nuevo un lote con el mismo nombre, la app lo actualiza en lugar de duplicarlo. El botón de capas (a la derecha del mapa) muestra u oculta los límites de países y provincias y los nombres de las localidades.', fig: 'carga' },
+  { t: 'Tomar puntos con el GPS en el campo (sin señal)',
+    intro: 'El colector registra latitud, longitud y precisión de cada punto, y guarda todo en la memoria del celular.',
+    steps: ['Abre la sección "Colector GPS de campo" y escribe el nombre del lote (por ejemplo, Lote La Tranquera).', 'Párate en el sitio de muestreo y toca "Capturar Punto GPS Actual". Espera unos segundos mientras mejora la precisión.', 'Si quieres usar la lectura sin esperar más, vuelve a tocar el botón.', 'Repite en cada sitio. Los puntos se numeran solos (1, 2, 3...).', 'Al terminar, toca "Guardar Lote en Memoria Local".'],
+    tip: 'Si aparece el aviso de precisión baja (más de 10 m), espera unos segundos a cielo abierto y vuelve a capturar. Para seguir otro día, toca el lápiz del lote guardado, agrega puntos y guarda de nuevo. Si borras un punto, los demás conservan su número.', fig: 'gps' },
+  { t: 'Pasar los puntos del celular a la PC',
+    intro: 'Los datos quedan en el celular. Para procesarlos en la PC hay dos caminos.',
+    steps: ['Opción A: en el celular, abre "Datos locales y respaldo" y toca "Descargar respaldo". Envía el archivo a la PC (WhatsApp, correo o AirDrop).', 'En la PC, abre la app, entra en "Datos locales y respaldo" y toca "Restaurar respaldo" eligiendo ese archivo.', 'Opción B: en "Lotes guardados en campo" descarga el GeoJSON y cárgalo en la PC con "Importar desde QGIS". También sirve para abrirlo en QGIS.'],
+    tip: 'El respaldo trae todos los lotes juntos y es la forma más segura de no perder datos.', fig: null },
+  { t: 'Procesar los lotes y generar las imágenes',
+    intro: 'Este paso se hace con conexión a internet, idealmente en la PC.',
+    steps: ['Revisa la sección "Configuración de capturas": margen alrededor del lote (100 a 500 m), formato de imagen (16:9 o 4:3), símbolo de los puntos (círculo, marcador, mira o triángulo) y su tamaño, y los elementos que quieres mostrar.', 'Presiona "Procesar Todos los Lotes y Generar Capturas".', 'La app recorre cada lote, encuadra el área con el margen elegido y arma la imagen satelital. Verás el avance en pantalla.', 'Al terminar, se abre la pestaña "Galería" con todas las imágenes.'],
+    tip: 'Puedes cambiar el símbolo, desactivar los números de los puntos, la fecha, la escala o cualquier otro elemento y volver a procesar: las imágenes se reemplazan. Si en la zona no hay imagen satelital de máximo detalle, la app usa automáticamente el mejor nivel disponible.', fig: 'proceso' },
+  { t: 'Descargar imágenes y datos',
+    intro: 'En la pestaña "Galería de Capturas y Exportación" están todas las imágenes procesadas.',
+    steps: ['Toca una imagen para verla ampliada.', '"Descargar JPG" baja la imagen de ese lote.', '"Descargar Todo en ZIP" baja todas las imágenes juntas en un archivo comprimido.', 'Los botones GeoJSON, CSV y KML bajan los lotes y puntos para QGIS, Excel o Google Earth.'],
+    tip: 'Las imágenes quedan guardadas en el dispositivo hasta que las borres.', fig: null },
+  { t: 'Respaldo y limpieza de datos',
+    intro: 'Los datos viven en el navegador del dispositivo. Conviene hacer respaldos.',
+    steps: ['"Descargar respaldo" guarda un archivo .json con todos los lotes.', '"Restaurar respaldo" recupera los lotes en el mismo u otro equipo.', '"Limpiar toda la base local" borra lotes e imágenes del dispositivo. No se puede deshacer.'],
+    tip: 'Haz un respaldo al volver del campo, antes de borrar datos del navegador o de cambiar de teléfono.', fig: null }
+];
+
+/* Ilustraciones de la guía (se dibujan en canvas: sirven para la ayuda y el PDF) */
+const FIG_CACHE = {};
+function makeFigure(type) {
+  if (FIG_CACHE[type]) return FIG_CACHE[type];
+  const W = 1200, H = 480, c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  if (!g) return '';
+  const F = (w, s) => `${w} ${s}px Inter, Helvetica, Arial, sans-serif`;
+  const T = (s, x, y, size = 22, color = '#0f172a', w = 600, align = 'left', font) => { g.font = font || F(w, size); g.fillStyle = color; g.textAlign = align; g.textBaseline = 'middle'; g.fillText(s, x, y); };
+  const box = (x, y, w, h, fill, stroke, r = 14, lw = 2) => { rr(g, x, y, w, h, r); if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw; g.stroke(); } };
+  const arrow = (x1, y1, x2, y2, color = '#10b981') => {
+    g.strokeStyle = color; g.fillStyle = color; g.lineWidth = 5; g.setLineDash([]);
+    g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+    const a = Math.atan2(y2 - y1, x2 - x1);
+    g.beginPath(); g.moveTo(x2 + 4 * Math.cos(a), y2 + 4 * Math.sin(a));
+    g.lineTo(x2 - 20 * Math.cos(a - 0.45), y2 - 20 * Math.sin(a - 0.45)); g.lineTo(x2 - 20 * Math.cos(a + 0.45), y2 - 20 * Math.sin(a + 0.45)); g.closePath(); g.fill();
+  };
+  const badge = (n, x, y) => { g.beginPath(); g.arc(x, y, 20, 0, Math.PI * 2); g.fillStyle = '#10b981'; g.fill(); g.lineWidth = 4; g.strokeStyle = '#fff'; g.stroke(); T(String(n), x, y + 1, 20, '#fff', 800, 'center'); };
+  const sat = (x, y, w, h) => {
+    g.save(); rr(g, x, y, w, h, 12); g.clip();
+    g.fillStyle = '#4b5d3a'; g.fillRect(x, y, w, h);
+    let seed = 11; const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+    const cols = ['#5c6e43', '#6b7b4c', '#7a7350', '#556b3d', '#8a7f5a', '#4e6236', '#70804e'];
+    for (let i = 0; i < 16; i++) { g.save(); g.fillStyle = cols[i % cols.length]; g.translate(x + rnd() * w, y + rnd() * h); g.rotate((rnd() - 0.5) * 0.5); g.fillRect(-w * 0.15, -h * 0.12, w * (0.18 + rnd() * 0.22), h * (0.14 + rnd() * 0.2)); g.restore(); }
+    g.strokeStyle = 'rgba(226,214,180,.6)'; g.lineWidth = 4; g.beginPath(); g.moveTo(x, y + h * 0.82); g.lineTo(x + w, y + h * 0.64); g.stroke();
+    g.restore();
+  };
+  const shape = [[0.16, 0.26], [0.66, 0.14], [0.86, 0.5], [0.62, 0.86], [0.22, 0.74]];
+  const lot = (x, y, w, h, lw = 3.5) => {
+    g.beginPath(); shape.forEach((p, i) => { const px = x + p[0] * w, py = y + p[1] * h; i ? g.lineTo(px, py) : g.moveTo(px, py); }); g.closePath();
+    g.lineJoin = 'round'; g.lineWidth = lw * 2; g.strokeStyle = 'rgba(0,0,0,.45)'; g.stroke(); g.lineWidth = lw; g.strokeStyle = '#facc15'; g.stroke();
+  };
+  const dot = (x, y, n, col = '#10b981', r = 8) => {
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fillStyle = col; g.fill(); g.lineWidth = 2.5; g.strokeStyle = '#fff'; g.stroke();
+    if (n != null) { g.font = F(800, 16); g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.85)'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.strokeText(n, x + 11, y - 9); g.fillStyle = '#fff'; g.fillText(n, x + 11, y - 9); }
+  };
+  const dots = (x, y, w, h, nums = true, r = 8) => [[0.35, 0.36], [0.55, 0.32], [0.68, 0.52], [0.45, 0.6], [0.32, 0.55]].forEach((p, i) => dot(x + p[0] * w, y + p[1] * h, nums ? String(i + 1) : null, '#10b981', r));
+  const fileIcon = (x, y, label = 'GEO', col = '#10b981') => {
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + 46, y); g.lineTo(x + 64, y + 18); g.lineTo(x + 64, y + 80); g.lineTo(x, y + 80); g.closePath();
+    g.fillStyle = '#fff'; g.fill(); g.lineWidth = 3; g.strokeStyle = '#94a3b8'; g.stroke();
+    box(x - 6, y + 44, 64, 24, col, null, 5); T(label, x + 26, y + 57, 14, '#fff', 800, 'center');
+  };
+  const phone = (x, y, w, h) => { box(x, y, w, h, '#0f172a', null, 36); box(x + 12, y + 20, w - 24, h - 40, '#1e293b', null, 22); };
+
+  g.fillStyle = '#f8fafc'; g.fillRect(0, 0, W, H);
+  g.strokeStyle = '#e2e8f0'; g.lineWidth = 2; g.strokeRect(1, 1, W - 2, H - 2);
+
+  if (type === 'flujo') {
+    box(50, 60, 330, 150, '#fff', '#cbd5e1'); fileIcon(82, 95); T('Archivo de QGIS', 172, 120, 26, '#0f172a', 700); T('.geojson en EPSG:4326', 172, 160, 19, '#64748b', 500);
+    box(50, 270, 330, 150, '#fff', '#cbd5e1'); box(86, 290, 60, 110, '#0f172a', null, 12); box(94, 304, 44, 74, '#10b981', null, 6); T('GPS del celular', 172, 330, 26, '#0f172a', 700); T('puntos sin señal', 172, 370, 19, '#64748b', 500);
+    arrow(392, 140, 462, 205); arrow(392, 345, 462, 280);
+    box(472, 100, 300, 280, '#0f172a', null, 18); sat(490, 118, 264, 176); lot(490, 118, 264, 176); dots(490, 118, 264, 176, false, 6);
+    T('Lotes y puntos', 622, 340, 24, '#ffffff', 700, 'center');
+    arrow(784, 240, 852, 240);
+    box(862, 100, 290, 280, '#fff', '#cbd5e1', 18); sat(892, 126, 150, 104); lot(892, 126, 150, 104, 2.5); sat(948, 160, 170, 116); lot(948, 160, 170, 116, 2.5);
+    T('Imágenes satelitales', 1007, 318, 22, '#0f172a', 700, 'center'); T('JPG individuales o ZIP', 1007, 350, 18, '#64748b', 500, 'center');
+  } else if (type === 'iphone') {
+    phone(110, 30, 220, 390); box(134, 64, 172, 22, '#334155', null, 6); box(134, 98, 172, 230, '#0b1220', null, 8); sat(140, 104, 160, 150); lot(140, 104, 160, 150, 2.5);
+    box(122, 352, 196, 46, '#e2e8f0', null, 10); g.beginPath(); g.arc(220, 375, 24, 0, Math.PI * 2); g.fillStyle = 'rgba(16,185,129,.25)'; g.fill();
+    g.strokeStyle = '#2563eb'; g.lineWidth = 3.5; g.beginPath(); g.moveTo(211, 370); g.lineTo(211, 386); g.lineTo(229, 386); g.lineTo(229, 370); g.stroke();
+    g.beginPath(); g.moveTo(220, 380); g.lineTo(220, 360); g.moveTo(213, 366); g.lineTo(220, 359); g.lineTo(227, 366); g.stroke();
+    badge(1, 104, 40); T('Toca Compartir', 220, 450, 22, '#0f172a', 700, 'center');
+    arrow(350, 225, 440, 225);
+    box(458, 80, 290, 300, '#fff', '#cbd5e1', 16);
+    T('Copiar', 486, 130, 21, '#334155', 500); g.fillStyle = '#e2e8f0'; g.fillRect(470, 165, 266, 2);
+    box(468, 180, 270, 72, '#d1fae5', '#10b981', 12, 2.5); T('Agregar a pantalla', 490, 205, 21, '#065f46', 700); T('de inicio', 490, 232, 21, '#065f46', 700);
+    g.strokeStyle = '#065f46'; g.lineWidth = 3; rr(g, 690, 200, 32, 32, 7); g.stroke(); g.beginPath(); g.moveTo(706, 208); g.lineTo(706, 224); g.moveTo(698, 216); g.lineTo(714, 216); g.stroke();
+    g.fillStyle = '#e2e8f0'; g.fillRect(470, 268, 266, 2); T('Imprimir', 486, 310, 21, '#334155', 500);
+    badge(2, 456, 84); T('Agregar a inicio', 603, 450, 22, '#0f172a', 700, 'center');
+    arrow(766, 225, 856, 225);
+    phone(872, 30, 220, 390);
+    for (let r = 0; r < 4; r++) for (let q = 0; q < 3; q++) { const ix = 906 + q * 56, iy = 76 + r * 66; if (r === 1 && q === 1) continue; box(ix, iy, 42, 42, '#475569', null, 10); }
+    box(956, 136, 54, 54, '#10b981', '#facc15', 12, 3); T('AgroField', 983, 206, 13, '#fff', 700, 'center');
+    badge(3, 866, 40); T('Abre desde el ícono', 982, 450, 22, '#0f172a', 700, 'center');
+  } else if (type === 'qgis') {
+    box(140, 30, 900, 410, '#fff', '#94a3b8', 10);
+    g.save(); rr(g, 140, 30, 900, 48, 10); g.clip(); g.fillStyle = '#e2e8f0'; g.fillRect(140, 30, 900, 48); g.restore();
+    T('Guardar capa vectorial como...', 166, 55, 20, '#0f172a', 700);
+    ['#ef4444', '#f59e0b', '#22c55e'].forEach((col, i) => { g.beginPath(); g.arc(1000 - i * 26, 54, 8, 0, Math.PI * 2); g.fillStyle = col; g.fill(); });
+    const field = (label, value, y, hi) => { T(label, 180, y + 22, 20, '#334155', 600); box(420, y, 580, 44, hi ? '#ecfdf5' : '#f8fafc', hi ? '#10b981' : '#cbd5e1', 8, hi ? 3 : 2); T(value, 438, y + 22, 19, '#0f172a', hi ? 700 : 500); };
+    field('Formato', 'GeoJSON                                      ▾', 106, true);
+    field('Nombre de archivo', 'C:\\campo\\lotes_campo.geojson', 176, false); box(944, 182, 46, 32, '#e2e8f0', '#94a3b8', 6, 1.5); T('...', 967, 197, 18, '#334155', 700, 'center');
+    field('SRC', 'EPSG:4326 - WGS 84                            ▾', 246, true);
+    T('Campo "lote" en la tabla de atributos = nombre del lote', 180, 330, 18, '#64748b', 500);
+    box(700, 370, 140, 46, '#fff', '#94a3b8', 8); T('Cancelar', 770, 393, 19, '#334155', 600, 'center');
+    box(856, 370, 144, 46, '#10b981', null, 8); T('Aceptar', 928, 393, 19, '#ffffff', 800, 'center');
+    badge(1, 1074, 128); badge(2, 1074, 198); badge(3, 1074, 268); badge(4, 1074, 393);
+  } else if (type === 'carga') {
+    box(50, 40, 440, 400, '#0f172a', null, 18); T('Importar desde QGIS', 80, 82, 22, '#ffffff', 700);
+    g.setLineDash([10, 8]); box(80, 112, 380, 140, 'rgba(16,185,129,.08)', '#10b981', 12, 2.5); g.setLineDash([]);
+    g.strokeStyle = '#10b981'; g.lineWidth = 4; g.beginPath(); g.moveTo(270, 170); g.lineTo(270, 140); g.moveTo(256, 153); g.lineTo(270, 139); g.lineTo(284, 153); g.stroke();
+    T('Seleccionar archivos .geojson', 270, 200, 20, '#6ee7b7', 700, 'center'); T('o arrástralos aquí', 270, 228, 16, '#94a3b8', 500, 'center');
+    [['Lote Norte', 'Polígono + 5 pts'], ['Lote La Tranquera', 'Polígono + 8 pts']].forEach((r, i) => { const y = 276 + i * 74; box(80, y, 380, 60, '#1e293b', null, 10); T(r[0], 100, y + 21, 18, '#ffffff', 700); T(r[1], 100, y + 42, 14, '#94a3b8', 500); });
+    arrow(500, 240, 540, 240);
+    sat(552, 40, 600, 400); lot(552, 40, 600, 400, 4); dots(552, 40, 600, 400, true, 9);
+  } else if (type === 'gps') {
+    phone(80, 14, 300, 452);
+    box(112, 60, 236, 44, '#0b1220', '#475569', 9); T('Lote La Tranquera', 126, 82, 17, '#e2e8f0', 500);
+    box(112, 120, 236, 54, '#10b981', null, 11); T('Capturar Punto GPS Actual', 230, 147, 16, '#ffffff', 800, 'center');
+    [['1', '-33.71482, -65.90217', '±4 m', '#6ee7b7'], ['2', '-33.71519, -65.90133', '±5 m', '#6ee7b7'], ['3', '-33.71566, -65.90198', '±14 m ⚠', '#fbbf24']].forEach((r, i) => {
+      const y = 192 + i * 46; box(112, y, 236, 38, '#0f172a', null, 7);
+      box(120, y + 8, 26, 22, 'rgba(34,211,238,.18)', null, 5); T(r[0], 133, y + 20, 13, '#67e8f9', 800, 'center');
+      T(r[1], 154, y + 19, 11, '#cbd5e1', 500, 'left', '500 11px "JetBrains Mono", monospace'); T(r[2], 340, y + 19, 12, r[3], 700, 'right');
+    });
+    box(112, 350, 236, 48, 'rgba(16,185,129,.12)', '#10b981', 10); T('Guardar Lote en Memoria Local', 230, 374, 14, '#6ee7b7', 700, 'center');
+    badge(1, 480, 90); T('Escribe el nombre del lote', 520, 90, 25, '#0f172a', 700);
+    badge(2, 480, 165); T('Captura un punto en cada sitio', 520, 165, 25, '#0f172a', 700);
+    badge(3, 480, 240); T('Guarda el lote al terminar', 520, 240, 25, '#0f172a', 700);
+    box(460, 300, 690, 116, '#fffbeb', '#fcd34d', 14); T('Aviso de precisión baja', 490, 338, 22, '#92400e', 800); T('Si supera ±10 m, espera unos segundos a cielo abierto y repite.', 490, 378, 19, '#92400e', 500);
+  } else if (type === 'proceso') {
+    const titles = [['Lote', 'polígono y puntos'], ['Margen (buffer)', '100 a 500 m'], ['Imagen satelital', 'Esri en alta resolución'], ['JPG / ZIP', 'listas para informes']];
+    titles.forEach((tt, i) => {
+      const x = 40 + i * 292;
+      box(x, 60, 250, 340, '#fff', '#cbd5e1', 16);
+      const ax = x + 22, ay = 82, aw = 206, ah = 200;
+      if (i === 0) { box(ax, ay, aw, ah, '#f1f5f9', null, 10); lot(ax + 30, ay + 30, aw - 60, ah - 60); dots(ax + 30, ay + 30, aw - 60, ah - 60, false, 6); }
+      if (i === 1) { box(ax, ay, aw, ah, '#f1f5f9', null, 10); lot(ax + 45, ay + 45, aw - 90, ah - 90); g.setLineDash([9, 7]); g.strokeStyle = '#10b981'; g.lineWidth = 3; g.strokeRect(ax + 18, ay + 18, aw - 36, ah - 36); g.setLineDash([]); arrow(ax + 52, ay + 42, ax + 22, ay + 22, '#10b981'); T('250 m', ax + aw / 2, ay + ah - 6, 16, '#047857', 800, 'center'); }
+      if (i === 2) { sat(ax, ay, aw, ah); lot(ax + 30, ay + 30, aw - 60, ah - 60); dots(ax + 30, ay + 30, aw - 60, ah - 60, true, 6); g.fillStyle = '#fff'; g.beginPath(); g.moveTo(ax + aw - 26, ay + 14); g.lineTo(ax + aw - 16, ay + 40); g.lineTo(ax + aw - 36, ay + 40); g.closePath(); g.fill(); }
+      if (i === 3) { fileIcon(ax + 40, ay + 30, 'JPG', '#0ea5e9'); fileIcon(ax + 110, ay + 60, 'ZIP', '#10b981'); }
+      T(tt[0], x + 125, 318, 23, '#0f172a', 800, 'center'); T(tt[1], x + 125, 352, 17, '#64748b', 500, 'center');
+      badge(i + 1, x + 6, 66);
+      if (i < 3) arrow(x + 256, 230, x + 286, 230);
+    });
+  }
+  FIG_CACHE[type] = c.toDataURL('image/jpeg', 0.9);
+  return FIG_CACHE[type];
+}
+function renderHelp() {
+  const body = $('#helpBody');
+  if (body.dataset.ready) return;
+  body.innerHTML = GUIDE.map((s, i) => `<section class="g-sec"><h3><span class="g-n">${i + 1}</span>${esc(s.t)}</h3><p>${esc(s.intro)}</p><ol>${s.steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol>${s.tip ? `<div class="g-tip"><strong>Consejo:</strong> ${esc(s.tip)}</div>` : ''}${s.fig ? `<img class="g-fig" alt="" data-fig="${s.fig}">` : ''}</section>`).join('');
+  body.dataset.ready = '1';
+  fontsReady().then(() => $$('img[data-fig]', body).forEach(img => { img.src = makeFigure(img.dataset.fig); }));
+}
+async function generateGuidePDF() {
+  const J = window.jspdf && window.jspdf.jsPDF;
+  if (!J) { toast('No se pudo cargar el generador de PDF. Conéctate a internet y recarga la página.', 'error'); return; }
+  const btns = $$('[data-act-pdf]'); btns.forEach(b => b.disabled = true);
+  try {
+    await fontsReady();
+    const doc = new J({ unit: 'mm', format: 'a4', compress: true });
+    const PW = 210, PH = 297, M = 18, CW = PW - 2 * M;
+    let y = 0;
+    const ensure = h => { if (y + h > PH - 20) { doc.addPage(); y = 22; } };
+    const lineH = size => size * 0.3528 * 1.45;
+    const write = (text, { size = 10.5, color = [51, 65, 85], style = 'normal', x = M, width = CW } = {}) => {
+      doc.setFont('helvetica', style); doc.setFontSize(size); doc.setTextColor(color[0], color[1], color[2]);
+      doc.splitTextToSize(text, width).forEach(l => { ensure(lineH(size)); doc.text(l, x, y); y += lineH(size); });
+    };
+    // Portada
+    doc.setFillColor(15, 23, 42); doc.rect(0, 0, PW, 54, 'F');
+    doc.setFillColor(16, 185, 129); doc.rect(0, 54, PW, 1.8, 'F');
+    doc.setFillColor(250, 204, 21); doc.rect(M, 14, 14, 1.4, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(25); doc.setTextColor(255, 255, 255); doc.text('Guía de Usuario', M, 27);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(11.5); doc.setTextColor(226, 232, 240);
+    doc.text('AgroField Capture: muestreo de suelos, visor GIS, colector GPS y capturas satelitales', M, 37);
+    doc.setFontSize(9); doc.setTextColor(110, 231, 183); doc.text(`Versión ${APP_VERSION}  |  ${fmtDate(new Date())}`, M, 46);
+    y = 68;
+    write('Contenido', { size: 13, style: 'bold', color: [15, 23, 42] }); y += 1;
+    GUIDE.forEach((s, i) => write(`${i + 1}.  ${s.t}`, { size: 10.5, color: [71, 85, 105], x: M + 2 }));
+    y += 6;
+    GUIDE.forEach((s, i) => {
+      ensure(40); y += 5;
+      doc.setFillColor(16, 185, 129); doc.roundedRect(M, y - 5.8, 8.5, 8.5, 1.8, 1.8, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(255, 255, 255); doc.text(String(i + 1), M + 4.25, y, { align: 'center' });
+      write(s.t, { size: 14, style: 'bold', color: [15, 23, 42], x: M + 12, width: CW - 12 });
+      doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.3); doc.line(M, y - 2.2, PW - M, y - 2.2); y += 3;
+      write(s.intro); y += 2;
+      s.steps.forEach((st, j) => {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5);
+        const lines = doc.splitTextToSize(st, CW - 10), h = lineH(10.5);
+        ensure(h * lines.length + 2);
+        doc.setFillColor(209, 250, 229); doc.circle(M + 3, y - 1.25, 3, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(4, 120, 87); doc.text(String(j + 1), M + 3, y - 0.2, { align: 'center' });
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(30, 41, 59);
+        lines.forEach(l => { doc.text(l, M + 9, y); y += h; });
+        y += 1.4;
+      });
+      if (s.tip) {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+        const lines = doc.splitTextToSize('Consejo: ' + s.tip, CW - 10), h = lineH(10), bh = lines.length * h + 5.5;
+        ensure(bh + 4); y += 1.5;
+        doc.setFillColor(236, 253, 245); doc.setDrawColor(167, 243, 208); doc.setLineWidth(0.3); doc.roundedRect(M, y, CW, bh, 2, 2, 'FD');
+        doc.setFillColor(16, 185, 129); doc.rect(M, y, 1.4, bh, 'F');
+        doc.setTextColor(6, 95, 70);
+        let ty = y + 4.6;
+        lines.forEach((l, k) => {
+          if (k === 0 && l.startsWith('Consejo:')) { doc.setFont('helvetica', 'bold'); doc.text('Consejo:', M + 5, ty); const w0 = doc.getTextWidth('Consejo: '); doc.setFont('helvetica', 'normal'); doc.text(l.slice(9), M + 5 + w0, ty); }
+          else doc.text(l, M + 5, ty);
+          ty += h;
+        });
+        y += bh + 4;
+      }
+      if (s.fig) {
+        const data = makeFigure(s.fig);
+        if (data) { const ih = CW * 480 / 1200; ensure(ih + 4); doc.addImage(data, 'JPEG', M, y, CW, ih); y += ih + 6; }
+      }
+    });
+    const n = doc.getNumberOfPages();
+    for (let p = 1; p <= n; p++) {
+      doc.setPage(p); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(148, 163, 184);
+      doc.text('Guía de Usuario - AgroField Capture', M, PH - 10);
+      doc.text(`Página ${p} de ${n}`, PW - M, PH - 10, { align: 'right' });
+    }
+    doc.save('Guia_de_Usuario_AgroField_Capture.pdf');
+    toast('Guía en PDF descargada.', 'success');
+  } catch (e) { console.error(e); toast('Error al generar el PDF: ' + e.message, 'error'); }
+  finally { btns.forEach(b => b.disabled = false); }
+}
+
+/* =====================================================================
+   15. EVENTOS DE LA INTERFAZ
+   ===================================================================== */
+function bindUI() {
+  $$('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+  document.addEventListener('click', e => { const go = e.target.closest('[data-goto]'); if (go) switchTab(go.dataset.goto); });
+  window.addEventListener('online', updateConn);
+  window.addEventListener('offline', updateConn);
+
+  // Importación
+  const fi = $('#fileInput'), dz = $('#dropZone');
+  fi.addEventListener('change', async () => { const files = Array.from(fi.files || []); fi.value = ''; if (files.length) await handleImport(files); });
+  ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('over'); }));
+  dz.addEventListener('drop', e => { const files = e.dataTransfer && e.dataTransfer.files; if (files && files.length) handleImport(files); });
+  $('#importWarnings').addEventListener('click', e => { if (e.target.closest('[data-act="close-warn"]')) renderImportWarnings([]); });
+  $('#importedList').addEventListener('click', e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const lot = state.importedLots.find(l => l.id === b.dataset.id); if (!lot) return;
+    if (b.dataset.act === 'zoom-imp') zoomToLot(normImported(lot));
+    if (b.dataset.act === 'geo-imp') exportLots([normImported(lot)], 'geojson', slug(lot.name));
+    if (b.dataset.act === 'del-imp') deleteImportedLot(lot.id);
+  });
+
+  // Colector GPS
+  $('#btnCapture').addEventListener('click', onCaptureClick);
+  $('#lotName').addEventListener('input', e => { state.draft.name = e.target.value; state.draft.dirty = true; saveDraft(); });
+  $('#lotName').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
+  $('#btnSaveLot').addEventListener('click', saveFieldLot);
+  $('#btnNewLot').addEventListener('click', () => resetDraft(true));
+  $('#btnCancelEdit').addEventListener('click', () => resetDraft(true));
+  $('#draftPoints').addEventListener('click', e => { const b = e.target.closest('[data-act="del-pt"]'); if (b) deleteDraftPoint(b.dataset.n); });
+  $('#fieldList').addEventListener('click', e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const lot = state.fieldLots.find(l => l.id === b.dataset.id); if (!lot) return;
+    if (b.dataset.act === 'zoom-field') zoomToLot(normField(lot));
+    if (b.dataset.act === 'edit-field') editFieldLot(lot.id);
+    if (b.dataset.act === 'geo-field') exportLots([normField(lot)], 'geojson', slug(lot.name));
+    if (b.dataset.act === 'del-field') deleteFieldLot(lot.id);
+  });
+  $$('[data-exp-field]').forEach(b => b.addEventListener('click', () => exportLots(state.fieldLots.map(normField).sort(sortByName), b.dataset.expField, 'lotes_campo')));
+  $$('[data-exp-all]').forEach(b => b.addEventListener('click', () => exportLots(allLots(), b.dataset.expAll, 'lotes_muestreo')));
+
+  // Configuración
+  $('#bufRange').addEventListener('input', e => { state.settings.buffer = +e.target.value; $('#bufVal').textContent = state.settings.buffer + ' m'; updateProcessInfo(); });
+  $('#bufRange').addEventListener('change', saveSettings);
+  $('#fmtSeg').addEventListener('click', e => { const b = e.target.closest('[data-fmt]'); if (!b) return; state.settings.format = b.dataset.fmt; saveSettings(); applySettingsUI(); updateProcessInfo(); });
+  $('#symSeg').addEventListener('click', e => { const b = e.target.closest('[data-sym]'); if (!b) return; state.settings.symbol = b.dataset.sym; saveSettings(); applySettingsUI(); renderMapLots(); });
+  let symSizeTimer = null;
+  $('#symSizeRange').addEventListener('input', e => {
+    state.settings.symSize = +e.target.value;
+    updateSymSizeUI();
+    clearTimeout(symSizeTimer); symSizeTimer = setTimeout(renderMapLots, 120); // el visor se actualiza en vivo
+  });
+  $('#symSizeRange').addEventListener('change', () => { saveSettings(); renderMapLots(); });
+  $('#elChecks').addEventListener('change', e => {
+    const c = e.target.closest('[data-el]'); if (!c) return;
+    state.settings.el[c.dataset.el] = c.checked; saveSettings();
+    if (c.dataset.el === 'labels') renderMapLots();
+  });
+
+  // Procesamiento
+  $('#btnProcess').addEventListener('click', processAll);
+  $('#pcCancel').addEventListener('click', () => { state.cancel = true; $('#pcTitle').textContent = 'Cancelando…'; });
+  window.addEventListener('beforeunload', e => { if (state.processing) { e.preventDefault(); e.returnValue = ''; } });
+
+  // Datos locales
+  $('#btnBackup').addEventListener('click', exportBackup);
+  $('#restoreInput').addEventListener('change', async e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) await importBackup(f); });
+  $('#btnClearAll').addEventListener('click', clearAll);
+
+  // Mapa
+  $('#btnFitAll').addEventListener('click', fitAll);
+  $('#btnLocate').addEventListener('click', locateMe);
+  $('#btnRef').addEventListener('click', toggleRefLayer);
+
+  // Galería
+  $('#btnZip').addEventListener('click', downloadZip);
+  $('#btnClearGallery').addEventListener('click', clearGallery);
+  $('#galleryGrid').addEventListener('click', e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    if (b.dataset.act === 'view') openLightbox(b.dataset.id);
+    if (b.dataset.act === 'jpg') downloadCap(b.dataset.id);
+    if (b.dataset.act === 'del-cap') deleteCap(b.dataset.id);
+  });
+
+  // Ayuda y modales
+  $('#btnHelp').addEventListener('click', () => { renderHelp(); openModal('#helpModal'); });
+  $$('[data-act-pdf]').forEach(b => b.addEventListener('click', generateGuidePDF));
+  $$('#helpModal, #lightbox').forEach(m => m.addEventListener('click', e => { if (e.target === m || e.target.closest('[data-close]')) closeModal(m); }));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') $$('#helpModal.open, #lightbox.open').forEach(closeModal); });
+}
+
+/* =====================================================================
+   16. MODO SIN CONEXIÓN (service worker) E ÍCONO DE INICIO
+   ===================================================================== */
+function registerSW() {
+  if (!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
+  navigator.serviceWorker.register('./sw.js').catch(e => console.warn('Service worker no registrado:', e));
+}
+function setTouchIcon() {
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = 180;
+    const g = c.getContext('2d'); if (!g) return;
+    const grd = g.createLinearGradient(0, 0, 180, 180); grd.addColorStop(0, '#0f172a'); grd.addColorStop(1, '#1e293b');
+    g.fillStyle = grd; g.fillRect(0, 0, 180, 180);
+    g.lineJoin = 'round'; g.lineWidth = 10; g.strokeStyle = '#facc15';
+    g.beginPath(); g.moveTo(38, 128); g.lineTo(64, 44); g.lineTo(134, 60); g.lineTo(146, 124); g.closePath(); g.stroke();
+    [[84, 84], [112, 104], [76, 112]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 11, 0, Math.PI * 2); g.fillStyle = '#10b981'; g.fill(); g.lineWidth = 4; g.strokeStyle = '#fff'; g.stroke(); });
+    const link = document.createElement('link'); link.rel = 'apple-touch-icon'; link.href = c.toDataURL('image/png');
+    document.head.appendChild(link);
+  } catch (e) { /* opcional */ }
+}
+
+/* =====================================================================
+   17. INICIO
+   ===================================================================== */
+async function init() {
+  hydrateIcons();
+  state.settings = loadSettings();
+  state.fieldLots = (store.get(LS.field, []) || []).filter(l => l && Array.isArray(l.points));
+  state.draft = Object.assign(newDraft(), store.get(LS.draft, {}) || {});
+  if (!Array.isArray(state.draft.points)) state.draft.points = [];
+  $('#verInfo').textContent = `Versión ${APP_VERSION}`;
+  bindUI();
+  applySettingsUI();
+  updateConn();
+  if (window.innerWidth < 900) { $('#secImport').open = false; }
+  initMap();
+  try {
+    state.importedLots = await idb.all('imported') || [];
+    state.captures = await idb.all('captures') || [];
+  } catch (e) {
+    console.warn(e);
+    toast('No se pudo abrir la base local de imágenes. Las imágenes no se conservarán al cerrar.', 'warn', 8000);
+  }
+  renderAll();
+  fitAll();
+  registerSW();
+  setTouchIcon();
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* nada */ }
+}
+
+window.MuestreoApp = { state, handleImport, planView, computeExtent, resolveTile, looksLikePlaceholder, symbolSVG, lotsToGeoJSON, lotsToCSV, lotsToKML, allLots, pointInGeom, GUIDE };
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
+</body>
+</html>
